@@ -141,7 +141,7 @@
             <div class="flex justify-between items-center mb-3">
               <div>
                 <h3 class="text-lg font-bold text-white">Live Nominees & Votes</h3>
-                <p class="text-[11px] text-cyan-300/70">Click any card to read its plot synopsis</p>
+                <p class="text-[11px] text-cyan-300/70">Click Goodreads to view summary & community reviews</p>
               </div>
               <span class="text-xs text-cyan-200" id="recCount">0 books</span>
             </div>
@@ -216,49 +216,6 @@
 
   </main>
 
-  <!-- SYNOPSIS MODAL POPUP -->
-  <div id="synopsisModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-[#001a52] border-2 border-burnBlue rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-      
-      <!-- Modal Header -->
-      <div class="p-5 border-b border-[#002b82] flex justify-between items-start gap-3 bg-midnight">
-        <div class="flex gap-3 min-w-0">
-          <img id="modalCover" src="" class="w-14 h-20 object-cover rounded shadow bg-[#001744] flex-shrink-0" alt="Cover" />
-          <div class="min-w-0">
-            <span id="modalGenre" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1"></span>
-            <h3 id="modalTitle" class="text-base font-extrabold text-white leading-snug break-words"></h3>
-            <p id="modalAuthor" class="text-xs text-burnBlue mt-0.5"></p>
-            <p id="modalSuggestedBy" class="text-[10px] text-slate-400 mt-0.5"></p>
-          </div>
-        </div>
-        <button onclick="closeSynopsisModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#002b82] transition">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body: Synopsis Content -->
-      <div class="p-6 overflow-y-auto space-y-3 text-slate-200 text-sm leading-relaxed">
-        <div class="flex items-center justify-between text-xs font-semibold text-candlelight border-b border-[#002b82]/60 pb-2">
-          <span>📖 Book Overview & Synopsis</span>
-          <span id="modalPages" class="text-cyan-300/80 font-normal"></span>
-        </div>
-        <div id="modalSynopsisText" class="text-xs md:text-sm text-slate-300 whitespace-pre-line leading-relaxed">
-          Loading synopsis...
-        </div>
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="p-4 border-t border-[#002b82] bg-midnight flex justify-end">
-        <button onclick="closeSynopsisModal()" class="px-5 py-2 rounded-lg bg-burnBlue text-midnight font-bold text-xs hover:bg-cyan-400 transition">
-          Close Overview
-        </button>
-      </div>
-
-    </div>
-  </div>
-
   <script>
     // -------------------------------------------------------------
     // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
@@ -305,7 +262,6 @@
     let pastReads = [];
     let recommendations = [];
     let ratingsDb = JSON.parse(localStorage.getItem('bbc_star_ratings') || '{}');
-    let synopsisCache = JSON.parse(localStorage.getItem('bbc_synopsis_cache') || '{}');
 
     let wheelMode = 'all';
     let currentWheelItems = [];
@@ -370,11 +326,10 @@
       return trimmed;
     }
 
-    // Helper to sanitize HTML tags and entities from API descriptions
-    function sanitizeDescription(rawHtml) {
-      if (!rawHtml) return "";
-      const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
-      return doc.body.textContent || doc.body.innerText || "";
+    // Direct Goodreads Search Generator
+    function getGoodreadsUrl(title, author) {
+      const q = encodeURIComponent(`${title} ${author}`.trim());
+      return `https://www.goodreads.com/search?q=${q}`;
     }
 
     async function fetchAppData() {
@@ -499,6 +454,7 @@
         const ratingInfo = getBookRatingData(currentBook.title);
         const meetingMonthText = cleanMeetingMonth(currentBook.meetingMonth);
         const genreText = genreDirectory[norm] || "Current Read";
+        const grUrl = getGoodreadsUrl(currentBook.title, currentBook.author);
 
         spotlightContainer.innerHTML = `
           <div class="rounded-2xl p-6 bg-gradient-to-r from-[#002063] via-[#002c87] to-[#001744] border-2 border-candlelight shadow-2xl shadow-candlelight/20 relative overflow-hidden flex flex-col md:flex-row items-center md:items-stretch gap-6">
@@ -522,6 +478,9 @@
                       🗓️ Meeting: ${meetingMonthText}
                     </span>
                   ` : ''}
+                  <a href="${grUrl}" target="_blank" rel="noopener noreferrer" class="text-xs font-bold text-burnBlue hover:text-cyan-300 underline flex items-center gap-1">
+                    Goodreads Overview ↗
+                  </a>
                 </div>
 
                 <h3 class="text-xl md:text-2xl font-extrabold text-white leading-tight break-words mt-1">${currentBook.title}</h3>
@@ -568,18 +527,28 @@
         const coverImg = b.cover || directIsbnCovers[norm] || createInlineSvgCover(b.title, b.author);
         const meetingMonthText = cleanMeetingMonth(b.meetingMonth);
         const genreText = genreDirectory[norm] || "Club Read";
+        const grUrl = getGoodreadsUrl(b.title, b.author);
 
         return `
           <div class="bg-midnight/70 border border-[#002b82] hover:border-burnBlue rounded-xl p-4 flex gap-4 transition shadow-lg">
-            <img onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${b.author.replace(/'/g, "\\'")}')"
-                 src="${coverImg}" 
-                 class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
+            <a href="${grUrl}" target="_blank" rel="noopener noreferrer" class="flex-shrink-0" title="View on Goodreads">
+              <img onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${b.author.replace(/'/g, "\\'")}')"
+                   src="${coverImg}" 
+                   class="w-20 h-28 object-cover rounded shadow-md hover:opacity-90 transition bg-[#001744]" alt="${b.title}" />
+            </a>
             <div class="flex flex-col justify-between flex-1 min-w-0">
               <div>
-                <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1">
-                  ${genreText}
-                </span>
-                <h4 class="text-sm font-bold text-white leading-snug break-words" title="${b.title}">${b.title}</h4>
+                <div class="flex items-center justify-between gap-1 mb-1">
+                  <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block">
+                    ${genreText}
+                  </span>
+                  <a href="${grUrl}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold text-burnBlue hover:underline flex items-center gap-0.5" title="Search Goodreads">
+                    <span>Goodreads</span> ↗
+                  </a>
+                </div>
+                <h4 class="text-sm font-bold text-white leading-snug break-words" title="${b.title}">
+                  <a href="${grUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-burnBlue transition">${b.title}</a>
+                </h4>
                 <p class="text-xs text-cyan-200 mt-0.5 truncate">${b.author}</p>
               </div>
               
@@ -608,6 +577,7 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
+    // Nominees list linking to Goodreads
     async function renderRecommendations() {
       const container = document.getElementById('recList');
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
@@ -622,11 +592,15 @@
       container.innerHTML = sorted.map((b) => {
         const norm = normalizeTitle(b.title);
         const coverSrc = b.customCover || directIsbnCovers[norm] || createInlineSvgCover(b.title, b.author);
+        const grUrl = getGoodreadsUrl(b.title, b.author);
+
         return `
-          <div onclick="openSynopsisModal('${b.id}')" 
-               class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue hover:bg-[#002875] transition cursor-pointer group">
+          <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition group">
             
-            <div class="flex items-center gap-3 min-w-0 flex-1">
+            <!-- Clickable area pointing directly to Goodreads search -->
+            <a href="${grUrl}" target="_blank" rel="noopener noreferrer" 
+               class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" 
+               title="View synopsis & reviews on Goodreads">
               <img onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
                    class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0 group-hover:scale-105 transition" 
                    src="${coverSrc}" />
@@ -638,12 +612,15 @@
                 <p class="text-xs text-cyan-200 truncate">${b.author}</p>
                 <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
                   ${b.suggestedBy ? `<span>By: ${b.suggestedBy}</span> • ` : ''}
-                  <span class="text-burnBlue font-semibold group-hover:underline">View synopsis ↗</span>
+                  <span class="text-burnBlue font-bold group-hover:underline flex items-center gap-0.5">
+                    <span>Goodreads</span> ↗
+                  </span>
                 </div>
               </div>
-            </div>
+            </a>
 
-            <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
+            <!-- Action buttons: Upvote & Delete -->
+            <div class="flex items-center gap-2 flex-shrink-0">
               <button onclick="upvoteRecommendation('${b.id}')" title="Vote" class="flex items-center gap-1.5 bg-[#001744] hover:bg-midnight active:scale-95 text-candlelight px-3 py-1.5 rounded-lg border border-[#003399] transition">
                 <span class="text-xs font-semibold">▲</span>
                 <span class="text-sm font-bold">${b.votes}</span>
@@ -658,88 +635,6 @@
         `;
       }).join('');
     }
-
-    // Google Books API query with projection=full and HTML sanitization
-    async function openSynopsisModal(nomineeId) {
-      const book = recommendations.find(r => String(r.id) === String(nomineeId));
-      if (!book) return;
-
-      const norm = normalizeTitle(book.title);
-      const coverSrc = book.customCover || directIsbnCovers[norm] || createInlineSvgCover(book.title, book.author);
-
-      document.getElementById('modalTitle').textContent = book.title;
-      document.getElementById('modalAuthor').textContent = `by ${book.author}`;
-      document.getElementById('modalGenre').textContent = book.genre || 'General Fiction';
-      document.getElementById('modalSuggestedBy').textContent = book.suggestedBy ? `Suggested by ${book.suggestedBy}` : '';
-      document.getElementById('modalCover').src = coverSrc;
-      document.getElementById('modalPages').textContent = '';
-      document.getElementById('modalSynopsisText').innerHTML = `
-        <div class="flex items-center gap-2 py-6 text-cyan-300">
-          <span class="w-2 h-2 rounded-full bg-burnBlue animate-ping"></span>
-          <span>Fetching full synopsis from Google Books...</span>
-        </div>
-      `;
-
-      document.getElementById('synopsisModal').classList.remove('hidden');
-
-      const cacheKey = `${book.title}-${book.author}`.toLowerCase();
-      if (synopsisCache[cacheKey]) {
-        document.getElementById('modalSynopsisText').textContent = synopsisCache[cacheKey].description;
-        if (synopsisCache[cacheKey].pageCount) {
-          document.getElementById('modalPages').textContent = `${synopsisCache[cacheKey].pageCount} pages`;
-        }
-        return;
-      }
-
-      try {
-        const cleanQuery = `intitle:"${book.title}" inauthor:"${book.author}"`;
-        // Include projection=full to ensure full overview text is returned
-        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&projection=full&maxResults=1`);
-        if (res.ok) {
-          const data = await res.json();
-          const info = data.items?.[0]?.volumeInfo;
-
-          if (info) {
-            const rawDescription = info.description || "";
-            const cleanText = sanitizeDescription(rawDescription);
-            const pageCount = info.pageCount || null;
-
-            if (cleanText) {
-              synopsisCache[cacheKey] = {
-                description: cleanText,
-                pageCount: pageCount
-              };
-              localStorage.setItem('bbc_synopsis_cache', JSON.stringify(synopsisCache));
-              document.getElementById('modalSynopsisText').textContent = cleanText;
-              if (pageCount) {
-                document.getElementById('modalPages').textContent = `${pageCount} pages`;
-              }
-              return;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("Could not fetch synopsis from Google Books:", err);
-      }
-
-      // Fallback message
-      document.getElementById('modalSynopsisText').innerHTML = `
-        <p class="italic text-slate-400">
-          No publisher synopsis was found online for this edition, but it was recommended as a <strong class="text-candlelight">${book.genre || 'great read'}</strong>!
-        </p>
-      `;
-    }
-
-    function closeSynopsisModal() {
-      document.getElementById('synopsisModal').classList.add('hidden');
-    }
-
-    window.addEventListener('click', (e) => {
-      const modal = document.getElementById('synopsisModal');
-      if (e.target === modal) {
-        closeSynopsisModal();
-      }
-    });
 
     async function handleNewRecommendation(e) {
       e.preventDefault();
