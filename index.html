@@ -163,7 +163,7 @@
             <!-- Winner announcement card -->
             <div id="winnerCard" class="hidden mt-4 w-full bg-[#001a52] border-2 border-candlelight p-4 rounded-xl text-center shadow-lg">
               <span class="text-xs uppercase font-extrabold tracking-wider text-candlelight">Next Book Club Pick</span>
-              <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1">Book Title</h4>
+              <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1 break-words">Book Title</h4>
               <p id="winnerAuthor" class="text-xs text-cyan-200 mb-3">Author</p>
               <button onclick="markAsReadFromWinner()" class="text-xs bg-burnBlue hover:bg-cyan-400 text-midnight font-bold px-4 py-2 rounded-md transition">Move to Past Reads</button>
             </div>
@@ -197,7 +197,7 @@
       "bad mother": "Romantic Suspense"
     };
 
-    // Pre-mapped high-res CDN covers (No API call required, loads instantly)
+    // Pre-mapped high-res CDN covers (Loads instantly without rate limits)
     const directIsbnCovers = {
       "first lie wins": "https://covers.openlibrary.org/b/isbn/9780593492918-M.jpg",
       "before we were innocent": "https://covers.openlibrary.org/b/isbn/9780593418574-M.jpg",
@@ -236,7 +236,6 @@
     let spinTimeTotal = 0;
     let currentWinner = null;
 
-    // Cache cover URLs in local storage
     const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
 
     function createInlineSvgCover(title, author) {
@@ -339,7 +338,6 @@
             }
           }
 
-          // If no custom cover, check direct ISBN database
           if (!customCover) {
             customCover = directIsbnCovers[norm] || directIsbnCovers[title.toLowerCase()] || '';
           }
@@ -403,7 +401,6 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
-    // Dynamic fetcher for novel recommendations not in initial list
     async function fetchDynamicCover(book, idx) {
       const imgEl = document.getElementById(`archive-img-${idx}`);
       const norm = normalizeTitle(book.title);
@@ -424,7 +421,6 @@
         return;
       }
 
-      // Stagger search to prevent 429 rate limiting
       setTimeout(async () => {
         try {
           const cleanQuery = `intitle:"${book.title}" inauthor:"${book.author}"`;
@@ -444,7 +440,6 @@
           }
         } catch (e) {}
 
-        // Fallback to Open Library
         try {
           const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(book.title)}&author=${encodeURIComponent(book.author)}&limit=1`);
           if (olRes.ok) {
@@ -518,11 +513,12 @@
                  class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
             <div class="flex flex-col justify-between flex-1 min-w-0">
               <div>
-                <span id="genre-badge-${idx}" class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1 truncate max-w-full">
+                <span id="genre-badge-${idx}" class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1">
                   ${b.genre}
                 </span>
-                <h4 class="text-sm font-bold text-white truncate" title="${b.title}">${b.title}</h4>
-                <p class="text-xs text-cyan-200 truncate">${b.author}</p>
+                <!-- Wrapped Title -->
+                <h4 class="text-sm font-bold text-white leading-snug break-words" title="${b.title}">${b.title}</h4>
+                <p class="text-xs text-cyan-200 mt-0.5 truncate">${b.author}</p>
               </div>
               
               <div class="mt-2 border-t border-[#002b82]/50 pt-2">
@@ -540,7 +536,7 @@
                   </span>
                   ${b.dateRead ? `
                     <span class="text-cyan-200/90 font-medium flex items-center gap-1 bg-[#001744] px-1.5 py-0.5 rounded">
-                      🗓️️ ${b.dateRead}
+                      🗓 ${b.dateRead}
                     </span>
                   ` : ''}
                 </div>
@@ -575,16 +571,17 @@
         const coverSrc = b.customCover || directIsbnCovers[norm] || directIsbnCovers[b.title.toLowerCase()] || createInlineSvgCover(b.title, b.author);
         return `
           <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition">
-            <div class="flex items-center gap-3 min-w-0">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
               <img id="rec-img-${b.id}" 
                    onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
                    class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
                    src="${coverSrc}" />
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-0.5">
                   ${b.genre || 'General Fiction'}
                 </span>
-                <h4 class="text-sm font-bold text-white truncate">${b.title}</h4>
+                <!-- Wrapped Title for Recommendations -->
+                <h4 class="text-sm font-bold text-white leading-snug break-words">${b.title}</h4>
                 <p class="text-xs text-cyan-200 truncate">${b.author}</p>
                 ${b.suggestedBy ? `<p class="text-[10px] text-slate-400">By: ${b.suggestedBy}</p>` : ''}
               </div>
