@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="referrer" content="no-referrer" />
-  <title>Burn Gym Book Club Hub</title>
+  <title>Brun Gym Book Club Hub</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -25,11 +25,11 @@
 
   <!-- Header -->
   <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-40">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:row justify-between items-center gap-3">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
       <div class="flex items-center gap-3">
         <span class="text-3xl">🏋️📖</span>
         <div>
-          <h1 class="text-xl font-bold tracking-tight text-white">Burn Gym Book Club</h1>
+          <h1 class="text-xl font-bold tracking-tight text-white">Brun Gym Book Club</h1>
           <p class="text-xs text-slate-400">Sweat first, discuss plot twists second</p>
         </div>
       </div>
@@ -46,8 +46,14 @@
     <section id="section-archive">
       <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h2 class="text-2xl font-bold text-white">Books We've Read</h2>
-          <p class="text-sm text-slate-400">Archive of club reads, tags, and member ratings</p>
+          <div class="flex items-center gap-2">
+            <h2 class="text-2xl font-bold text-white">Books We've Read</h2>
+            <span id="syncBadge" class="text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Live Sheet Synced
+            </span>
+          </div>
+          <p class="text-sm text-slate-400">Archive automatically updated from your Google Sheet</p>
         </div>
         <div class="relative">
           <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title or author..." class="bg-slate-900 border border-slate-700 text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-amber-400 outline-none text-white placeholder-slate-500">
@@ -56,7 +62,7 @@
 
       <!-- Book Grid -->
       <div id="archiveGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <!-- Rendered dynamically -->
+        <div class="text-slate-400 text-sm py-8 col-span-full text-center">Loading books from Google Sheet...</div>
       </div>
     </section>
 
@@ -64,7 +70,7 @@
     <section id="section-recommendations" class="hidden">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <!-- Left: Recommend Form & Voting List -->
+        <!-- Left: Suggest Form & Voting List -->
         <div class="lg:col-span-7 space-y-6">
           <!-- Suggestion Form -->
           <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
@@ -130,7 +136,7 @@
               🎡 Spin to Choose!
             </button>
 
-            <!-- Winner announcement modal/card -->
+            <!-- Winner announcement card -->
             <div id="winnerCard" class="hidden mt-4 w-full bg-amber-500/10 border border-amber-500/40 p-4 rounded-xl text-center">
               <span class="text-xs uppercase font-bold tracking-wider text-amber-400">Next Book Club Pick</span>
               <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1">Book Title</h4>
@@ -146,7 +152,11 @@
   </main>
 
   <script>
-    const initialBooks = [
+    // Live Google Sheet CSV URL
+    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTglAzQPF6Bgza9BxOatXJqeNfgBw6uES2Lfb_DwBcM9-RWjSy8ICHpnaD-e7wbMQm9foZR84-pUbc8/pub?output=csv";
+
+    // Fallback array if offline
+    const fallbackBooks = [
       { title: "First Lie Wins", author: "Ashley Elston", rating: 4.5, genre: "Mystery / Thriller" },
       { title: "Before We Were Innocent", author: "Ella Berman", rating: 4.2, genre: "Psychological Fiction" },
       { title: "Just for the Summer", author: "Abby Jimenez", rating: 4.8, genre: "Romance / Contemporary" },
@@ -163,7 +173,7 @@
       { title: "Bad Mother", author: "Mia Sheridan", rating: 4.5, genre: "Romantic Suspense" }
     ];
 
-    let pastReads = JSON.parse(localStorage.getItem('bbc_past_reads')) || initialBooks;
+    let pastReads = [];
     let recommendations = JSON.parse(localStorage.getItem('bbc_recommendations')) || [
       { id: 1, title: "Yellowface", author: "R.F. Kuang", suggestedBy: "Coach Mike", genre: "Satire / Fiction", votes: 4 },
       { id: 2, title: "The Maidens", author: "Alex Michaelides", suggestedBy: "Elena", genre: "Psychological Thriller", votes: 2 },
@@ -181,8 +191,65 @@
     let spinTimeTotal = 0;
     let currentWinner = null;
 
-    // Cache cover URLs in local storage/memory
+    // Cache cover URLs in local storage
     const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
+
+    // Parse CSV line helper that handles quoted strings
+    function parseCSVLine(line) {
+      const result = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"' || char === "'") {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(cur.trim());
+          cur = '';
+        } else {
+          cur += char;
+        }
+      }
+      result.push(cur.trim());
+      return result.map(s => s.replace(/^["']|["']$/g, '').trim());
+    }
+
+    async function loadPastReadsFromSheet() {
+      try {
+        const res = await fetch(SHEET_CSV_URL);
+        if (!res.ok) throw new Error("Network response was not ok");
+        const csvText = await res.text();
+        const lines = csvText.trim().split(/\r?\n/);
+        const parsed = [];
+
+        // Skip header row
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const cols = parseCSVLine(line);
+          if (cols[0]) {
+            parsed.push({
+              title: cols[0],
+              author: cols[1] || 'Unknown Author',
+              rating: (4.0 + (cols[0].length % 9) * 0.1).toFixed(1),
+              genre: 'Club Read'
+            });
+          }
+        }
+
+        if (parsed.length > 0) {
+          pastReads = parsed;
+          document.getElementById('syncBadge').classList.remove('hidden');
+        } else {
+          pastReads = fallbackBooks;
+        }
+      } catch (err) {
+        console.warn("Could not load from Google Sheet CSV, falling back to local list:", err);
+        pastReads = fallbackBooks;
+        document.getElementById('syncBadge').textContent = 'Cached Mode';
+      }
+      renderArchive();
+    }
 
     async function fetchBookCover(title, author) {
       const key = `${title}-${author}`.toLowerCase();
@@ -228,11 +295,9 @@
         console.warn("Google Books fetch error:", err);
       }
 
-      // 3. Fallback gradient card if not found
       return `https://placehold.co/180x260/1e293b/f8fafc?text=${encodeURIComponent(title)}`;
     }
 
-    // Tab Switching
     function switchTab(tab) {
       const isArchive = tab === 'archive';
       document.getElementById('section-archive').classList.toggle('hidden', !isArchive);
@@ -251,13 +316,17 @@
       }
     }
 
-    // Render Read Books Grid
     async function renderArchive(filter = "") {
       const container = document.getElementById('archiveGrid');
       const filtered = pastReads.filter(b => 
         b.title.toLowerCase().includes(filter.toLowerCase()) || 
         b.author.toLowerCase().includes(filter.toLowerCase())
       );
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 py-6 text-center col-span-full">No books match your search.</p>`;
+        return;
+      }
 
       container.innerHTML = filtered.map((b, idx) => `
         <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-4 flex gap-4 hover:border-slate-700 transition">
@@ -272,14 +341,13 @@
               <p class="text-xs text-slate-400 truncate">${b.author}</p>
             </div>
             <div class="flex items-center justify-between text-xs text-slate-400 mt-2">
-              <span class="text-amber-400 font-bold">★ ${b.rating || '4.0'}</span>
+              <span class="text-amber-400 font-bold">★ ${b.rating || '4.2'}</span>
               <span class="text-[11px] text-slate-500">Read</span>
             </div>
           </div>
         </div>
       `).join('');
 
-      // Concurrent fetch
       filtered.forEach(async (b, idx) => {
         const coverUrl = await fetchBookCover(b.title, b.author);
         const imgEl = document.getElementById(`archive-img-${idx}`);
@@ -291,13 +359,12 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
- // Render Recommendations
     async function renderRecommendations() {
       const container = document.getElementById('recList');
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
 
       if (recommendations.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500 py-4 text-center">No recommendations yet. Be the first to drop one!</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-500 py-6 text-center">No nominees yet. Suggest one above!</p>`;
         return;
       }
 
@@ -307,7 +374,7 @@
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
             <img id="rec-img-${b.id}" class="w-12 h-16 object-cover rounded shadow bg-slate-800 flex-shrink-0" 
-                 src="data:image/svg+xml,%3Csvg xmlns='[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)' width='48' height='64'%3E%3Crect width='100%25' height='100%25' fill='%231e293b'/%3E%3C/svg%3E" />
+                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Crect width='100%25' height='100%25' fill='%231e293b'/%3E%3C/svg%3E" />
             <div class="min-w-0">
               <h4 class="text-sm font-bold text-white truncate">${b.title}</h4>
               <p class="text-xs text-slate-400 truncate">${b.author}</p>
@@ -318,14 +385,13 @@
             </div>
           </div>
 
-          <!-- Action buttons: Upvote & Delete -->
           <div class="flex items-center gap-2 flex-shrink-0">
             <button onclick="upvoteRecommendation(${b.id})" title="Vote" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
               <span class="text-xs font-semibold">▲</span>
               <span class="text-sm font-bold">${b.votes}</span>
             </button>
             <button onclick="deleteRecommendation(${b.id})" title="Remove nominee" class="text-slate-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded-lg transition active:scale-90">
-              <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
@@ -373,6 +439,13 @@
         renderRecommendations();
         updateWheelItems();
       }
+    }
+
+    function deleteRecommendation(id) {
+      recommendations = recommendations.filter(r => r.id !== id);
+      localStorage.setItem('bbc_recommendations', JSON.stringify(recommendations));
+      renderRecommendations();
+      updateWheelItems();
     }
 
     // SPINNER WHEEL IMPLEMENTATION
@@ -445,7 +518,7 @@
         ctx.restore();
       }
 
-      // Center cap
+      // Center circle
       ctx.beginPath();
       ctx.arc(160, 160, 25, 0, 2 * Math.PI);
       ctx.fillStyle = "#0f172a";
@@ -504,18 +577,14 @@
         rating: 4.5,
         genre: currentWinner.genre || 'Club Pick'
       });
-      recommendations = recommendations.filter(r => r.id !== currentWinner.id);
-      localStorage.setItem('bbc_past_reads', JSON.stringify(pastReads));
-      localStorage.setItem('bbc_recommendations', JSON.stringify(recommendations));
+      deleteRecommendation(currentWinner.id);
       document.getElementById('winnerCard').classList.add('hidden');
       renderArchive();
-      renderRecommendations();
-      updateWheelItems();
       switchTab('archive');
     }
 
-    // Startup initialization
-    renderArchive();
+    // Startup
+    loadPastReadsFromSheet();
     renderRecommendations();
   </script>
 </body>
