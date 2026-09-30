@@ -74,14 +74,25 @@
               Live Sheet Connected
             </span>
           </div>
-          <p class="text-sm text-cyan-100/70">Dates reflect Meeting Month from Column C. Tap stars to rate!</p>
+          <p class="text-sm text-cyan-100/70">Ordered newest to oldest. Tap any star to rate!</p>
         </div>
         <div class="relative">
           <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, genre, or month..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
         </div>
       </div>
 
-      <!-- Book Grid -->
+      <!-- Current Book Spotlight Container -->
+      <div id="currentBookSpotlight" class="mb-8">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Section Title for Previous Archive -->
+      <div id="archiveHeading" class="mb-4 flex items-center justify-between border-b border-[#002b82] pb-2 hidden">
+        <h3 class="text-sm uppercase tracking-wider font-extrabold text-cyan-200">Past Book Archives</h3>
+        <span id="archiveCount" class="text-xs text-slate-400"></span>
+      </div>
+
+      <!-- Book Grid (Older Reads) -->
       <div id="archiveGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <div class="text-cyan-200 text-sm py-8 col-span-full text-center">Loading books from Google Sheet...</div>
       </div>
@@ -160,16 +171,27 @@
               🎡 Spin to Choose!
             </button>
 
-            <!-- Winner announcement card with Google Sheet writeback -->
+            <!-- Winner announcement card with Month Selector & Google Sheet writeback -->
             <div id="winnerCard" class="hidden mt-4 w-full bg-[#001a52] border-2 border-candlelight p-5 rounded-xl text-center shadow-2xl">
               <span class="text-xs uppercase font-extrabold tracking-wider text-candlelight">Next Book Club Pick</span>
               <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1 break-words">Book Title</h4>
-              <p id="winnerAuthor" class="text-xs text-cyan-200 mb-4">Author</p>
+              <p id="winnerAuthor" class="text-xs text-cyan-200 mb-3">Author</p>
+
+              <!-- Meeting Month Selector -->
+              <div class="bg-[#00133b] border border-[#002b82] rounded-lg p-3 my-3 text-left">
+                <label class="block text-xs font-bold text-candlelight mb-1">Set Meeting Month (Column C):</label>
+                <div class="flex gap-2">
+                  <input type="text" id="winnerMeetingMonth" placeholder="e.g. November 2026" class="flex-1 bg-[#001f5c] border border-[#003399] rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-burnBlue" />
+                  <button type="button" onclick="setNextMonthSuggestion()" class="bg-[#002b82] hover:bg-burnBlue hover:text-midnight text-cyan-200 text-[10px] font-bold px-2 py-1.5 rounded transition">
+                    +1 Month
+                  </button>
+                </div>
+              </div>
               
               <button id="chooseBtn" onclick="markAsReadFromWinner()" class="w-full bg-gradient-to-r from-candlelight to-amber-400 hover:from-yellow-300 hover:to-candlelight text-midnight font-extrabold py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
                 <span>✅ Choose This Book & Save to Sheet</span>
               </button>
-              <p class="text-[10px] text-cyan-300/70 mt-2">Appends row with current month/year to Column C (Meeting Month)</p>
+              <p class="text-[10px] text-cyan-300/70 mt-2">Appends row with the selected month to Column C</p>
             </div>
           </div>
         </div>
@@ -185,7 +207,7 @@
     // -------------------------------------------------------------
     const SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbwoyKzLW-QWXpHg5bhoTcupQ6vxpKxwx0PmIgU2p7ISJHWyRiI5JQaAcwNtyRfvIR4/exec";
 
-    // Direct ISBN covers for instant rendering
+    // Direct ISBN covers for instant rendering without rate limits
     const directIsbnCovers = {
       "first lie wins": "https://covers.openlibrary.org/b/isbn/9780593492918-M.jpg",
       "before we were innocent": "https://covers.openlibrary.org/b/isbn/9780593418574-M.jpg",
@@ -280,7 +302,6 @@
       return (t || '').toLowerCase().replace(/['"’]/g, '').trim();
     }
 
-    // Cleans dates (handles raw timestamps like 2024-03-01T00:00:00.000Z -> March 2024)
     function cleanMeetingMonth(str) {
       if (!str) return "";
       const trimmed = str.trim();
@@ -291,7 +312,6 @@
       return trimmed;
     }
 
-    // Fetch shared live database from Apps Script
     async function fetchAppData() {
       try {
         const res = await fetch(SCRIPT_API_URL);
@@ -362,9 +382,38 @@
       }
     }
 
-    // Render Archive with Column C Meeting Month & Current Book Highlight
+    // Helper to generate star buttons HTML
+    function buildStarRatingHtml(safeTitle, ratingInfo) {
+      const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
+        const isFilled = starNum <= (ratingInfo.userVote || Math.round(parseFloat(ratingInfo.avg)));
+        const isUserVoted = starNum <= ratingInfo.userVote;
+        return `
+          <button onclick="voteBookRating('${safeTitle}', ${starNum})" 
+                  title="Rate ${starNum} stars" 
+                  class="star-btn text-base ${isUserVoted ? 'text-candlelight font-bold' : (isFilled ? 'text-candlelight/70' : 'text-slate-600')}">
+            ★
+          </button>
+        `;
+      }).join('');
+
+      return `
+        <div class="flex items-center gap-0.5">
+          ${starsHtml}
+        </div>
+        <span class="text-xs font-bold text-candlelight whitespace-nowrap">
+          ${ratingInfo.avg} <span class="text-[10px] text-cyan-200/60 font-normal">(${ratingInfo.count})</span>
+        </span>
+      `;
+    }
+
+    // Render Archive: NEWEST TO OLDEST with Featured Current Book
     async function renderArchive(filter = "") {
-      const container = document.getElementById('archiveGrid');
+      const spotlightContainer = document.getElementById('currentBookSpotlight');
+      const gridContainer = document.getElementById('archiveGrid');
+      const archiveHeading = document.getElementById('archiveHeading');
+      const archiveCount = document.getElementById('archiveCount');
+
+      // Filter
       const filtered = pastReads.filter(b => 
         b.title.toLowerCase().includes(filter.toLowerCase()) || 
         b.author.toLowerCase().includes(filter.toLowerCase()) ||
@@ -372,71 +421,121 @@
       );
 
       if (filtered.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center col-span-full">No books match your search.</p>`;
+        spotlightContainer.innerHTML = '';
+        archiveHeading.classList.add('hidden');
+        gridContainer.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center col-span-full">No books match your search.</p>`;
         return;
       }
 
-      // The last row in Sheet1 is the most recent book
-      const currentBookIndex = filtered.length - 1;
+      // REVERSE ORDER: The newest additions (last rows in Sheet) become Index 0
+      const orderedReads = [...filtered].reverse();
 
-      container.innerHTML = filtered.map((b, idx) => {
+      // CURRENT BOOK SPOTLIGHT (Index 0 when not filtering)
+      if (!filter) {
+        const currentBook = orderedReads[0];
+        const safeTitle = currentBook.title.replace(/'/g, "\\'");
+        const norm = normalizeTitle(currentBook.title);
+        const coverImg = currentBook.cover || directIsbnCovers[norm] || createInlineSvgCover(currentBook.title, currentBook.author);
+        const ratingInfo = getBookRatingData(currentBook.title);
+        const meetingMonthText = cleanMeetingMonth(currentBook.meetingMonth);
+        const genreText = genreDirectory[norm] || "Current Read";
+
+        spotlightContainer.innerHTML = `
+          <div class="rounded-2xl p-6 bg-gradient-to-r from-[#002063] via-[#002c87] to-[#001744] border-2 border-candlelight shadow-2xl shadow-candlelight/20 relative overflow-hidden flex flex-col md:flex-row items-center md:items-stretch gap-6">
+            <div class="absolute -right-8 -bottom-8 text-8xl opacity-10 select-none pointer-events-none">🔥</div>
+            
+            <!-- Larger Cover for Current Book -->
+            <img onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${currentBook.author.replace(/'/g, "\\'")}')"
+                 src="${coverImg}" 
+                 class="w-32 h-48 md:w-36 md:h-52 object-cover rounded-xl shadow-2xl flex-shrink-0 bg-[#001744] border-2 border-candlelight/50" alt="${currentBook.title}" />
+            
+            <!-- Book Details -->
+            <div class="flex flex-col justify-between flex-1 text-center md:text-left min-w-0">
+              <div>
+                <div class="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
+                  <span class="text-xs font-black tracking-wider px-3 py-1 rounded-full bg-candlelight text-midnight shadow inline-flex items-center gap-1.5 animate-pulse">
+                    <span>🔥 CURRENT BOOK</span>
+                  </span>
+                  <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-[#001744] text-cyan-200 border border-[#003399]">
+                    ${genreText}
+                  </span>
+                  ${meetingMonthText ? `
+                    <span class="text-xs font-bold text-candlelight bg-[#001744] border border-candlelight/40 px-2.5 py-1 rounded-full flex items-center gap-1">
+                      🗓️ Meeting: ${meetingMonthText}
+                    </span>
+                  ` : ''}
+                </div>
+
+                <h3 class="text-xl md:text-2xl font-extrabold text-white leading-tight break-words mt-1">${currentBook.title}</h3>
+                <p class="text-sm font-semibold text-burnBlue mt-1">by ${currentBook.author}</p>
+                <p class="text-xs text-slate-300 mt-2 line-clamp-2 md:line-clamp-none max-w-2xl">
+                  Currently reading for our upcoming gym book club meeting. Sweat first, discuss plot twists second!
+                </p>
+              </div>
+
+              <!-- Star Rating Component for Current Book -->
+              <div class="mt-4 pt-3 border-t border-[#003399]/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  ${buildStarRatingHtml(safeTitle, ratingInfo)}
+                </div>
+                <span class="text-xs text-cyan-300/80">
+                  ${ratingInfo.userVote ? `Your rating: ${ratingInfo.userVote}★` : 'Tap stars to cast your vote'}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        archiveHeading.classList.remove('hidden');
+        archiveCount.textContent = `${orderedReads.length - 1} books`;
+
+        // The remaining books (Index 1 and beyond)
+        renderGrid(orderedReads.slice(1), gridContainer);
+      } else {
+        // When searching, display matching results in grid
+        spotlightContainer.innerHTML = '';
+        archiveHeading.classList.remove('hidden');
+        archiveCount.textContent = `${orderedReads.length} matching`;
+        renderGrid(orderedReads, gridContainer);
+      }
+    }
+
+    // Helper to render remaining books in grid (newest to oldest)
+    function renderGrid(books, container) {
+      if (books.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center col-span-full">No previous books to display.</p>`;
+        return;
+      }
+
+      container.innerHTML = books.map((b, idx) => {
         const ratingInfo = getBookRatingData(b.title);
         const safeTitle = b.title.replace(/'/g, "\\'");
         const norm = normalizeTitle(b.title);
-        const initialCover = b.cover || directIsbnCovers[norm] || createInlineSvgCover(b.title, b.author);
-        const isCurrentBook = (idx === currentBookIndex && !filter);
+        const coverImg = b.cover || directIsbnCovers[norm] || createInlineSvgCover(b.title, b.author);
         const meetingMonthText = cleanMeetingMonth(b.meetingMonth);
         const genreText = genreDirectory[norm] || "Club Read";
 
-        const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
-          const isFilled = starNum <= (ratingInfo.userVote || Math.round(parseFloat(ratingInfo.avg)));
-          const isUserVoted = starNum <= ratingInfo.userVote;
-          return `
-            <button onclick="voteBookRating('${safeTitle}', ${starNum})" 
-                    title="Rate ${starNum} stars" 
-                    class="star-btn text-base ${isUserVoted ? 'text-candlelight font-bold' : (isFilled ? 'text-candlelight/70' : 'text-slate-600')}">
-              ★
-            </button>
-          `;
-        }).join('');
-
         return `
-          <div class="rounded-xl p-4 flex gap-4 transition shadow-lg relative ${
-            isCurrentBook 
-              ? 'bg-gradient-to-br from-[#002063] via-[#002b82] to-[#011a4d] border-2 border-candlelight shadow-candlelight/20 shadow-2xl scale-[1.02]' 
-              : 'bg-midnight/70 border border-[#002b82] hover:border-burnBlue'
-          }">
-            <img id="archive-img-${idx}" 
-                 onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${b.author.replace(/'/g, "\\'")}')"
-                 src="${initialCover}" 
+          <div class="bg-midnight/70 border border-[#002b82] hover:border-burnBlue rounded-xl p-4 flex gap-4 transition shadow-lg">
+            <img onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${b.author.replace(/'/g, "\\'")}')"
+                 src="${coverImg}" 
                  class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
             <div class="flex flex-col justify-between flex-1 min-w-0">
               <div>
-                ${isCurrentBook ? `
-                  <span class="text-[10px] font-extrabold tracking-wider px-2.5 py-0.5 rounded-full bg-candlelight text-midnight inline-flex items-center gap-1 mb-1.5 shadow">
-                    <span>🔥 CURRENT BOOK</span>
-                  </span>
-                ` : `
-                  <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1">
-                    ${genreText}
-                  </span>
-                `}
+                <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1">
+                  ${genreText}
+                </span>
                 <h4 class="text-sm font-bold text-white leading-snug break-words" title="${b.title}">${b.title}</h4>
                 <p class="text-xs text-cyan-200 mt-0.5 truncate">${b.author}</p>
               </div>
               
               <div class="mt-2 border-t border-[#002b82]/50 pt-2">
                 <div class="flex items-center justify-between gap-1 mb-1">
-                  <div class="flex items-center gap-0.5">
-                    ${starsHtml}
-                  </div>
-                  <span class="text-xs font-bold text-candlelight whitespace-nowrap">
-                    ${ratingInfo.avg} <span class="text-[10px] text-cyan-200/60 font-normal">(${ratingInfo.count})</span>
-                  </span>
+                  ${buildStarRatingHtml(safeTitle, ratingInfo)}
                 </div>
                 <div class="flex items-center justify-between text-[11px] text-slate-400">
                   <span class="text-[10px] text-cyan-300/60">
-                    ${ratingInfo.userVote ? `You voted: ${ratingInfo.userVote}★` : 'Tap star to rate'}
+                    ${ratingInfo.userVote ? `You: ${ratingInfo.userVote}★` : 'Tap to rate'}
                   </span>
                   ${meetingMonthText ? `
                     <span class="text-cyan-200/90 font-medium flex items-center gap-1 bg-[#001744] px-1.5 py-0.5 rounded border border-[#003399]">
@@ -473,8 +572,7 @@
         return `
           <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition">
             <div class="flex items-center gap-3 min-w-0 flex-1">
-              <img id="rec-img-${b.id}" 
-                   onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
+              <img onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
                    class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
                    src="${coverSrc}" />
               <div class="min-w-0 flex-1">
@@ -667,6 +765,14 @@
       rotateWheel();
     }
 
+    function setNextMonthSuggestion() {
+      const now = new Date();
+      // Suggest next month
+      now.setMonth(now.getMonth() + 1);
+      const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      document.getElementById('winnerMeetingMonth').value = `${months[now.getMonth()]} ${now.getFullYear()}`;
+    }
+
     function stopRotateWheel() {
       clearTimeout(spinTimeout);
       const degrees = startAngle * 180 / Math.PI + 90;
@@ -676,6 +782,10 @@
       
       document.getElementById('winnerText').textContent = currentWinner.title;
       document.getElementById('winnerAuthor').textContent = `By ${currentWinner.author}`;
+      
+      // Pre-fill suggested meeting month
+      setNextMonthSuggestion();
+
       document.getElementById('winnerCard').classList.remove('hidden');
       document.getElementById('spinBtn').disabled = false;
     }
@@ -686,7 +796,7 @@
       return b + c * (tc + -3 * ts + 3 * t);
     }
 
-    // Save chosen book to Sheet1 with Meeting Month in Column C
+    // Save chosen book to Sheet1 with User-Selected Meeting Month in Column C
     async function markAsReadFromWinner() {
       if (!currentWinner) return;
 
@@ -694,15 +804,13 @@
       chooseBtn.disabled = true;
       chooseBtn.innerHTML = '<span>⏳ Saving to Google Sheet...</span>';
 
-      const now = new Date();
-      const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-      const monthYear = `${months[now.getMonth()]} ${now.getFullYear()}`;
+      const customMonth = document.getElementById('winnerMeetingMonth').value.trim() || "Upcoming";
 
-      // Optimistically push to local pastReads with Column C Meeting Month
+      // Push to local pastReads (appended at end of sheet, so it becomes the latest/current book)
       pastReads.push({
         title: currentWinner.title,
         author: currentWinner.author,
-        meetingMonth: monthYear,
+        meetingMonth: customMonth,
         cover: currentWinner.customCover || ''
       });
 
@@ -717,6 +825,7 @@
             action: "chooseWinner",
             title: currentWinner.title,
             author: currentWinner.author,
+            meetingMonth: customMonth,
             customCover: currentWinner.customCover || '',
             id: String(currentWinner.id)
           })
@@ -735,6 +844,7 @@
       switchTab('archive');
     }
 
+    // Fetch shared live database on page load and poll every 30 seconds
     fetchAppData();
     setInterval(fetchAppData, 30000);
   </script>
