@@ -178,7 +178,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTglAzQPF6Bgza9BxOatXJqeNfgBw6uES2Lfb_DwBcM9-RWjSy8ICHpnaD-e7wbMQm9foZR84-pUbc8/pub?output=csv";
 
-    // Known genres for seed books
+    // Known genres for books
     const genreDirectory = {
       "first lie wins": "Mystery / Thriller",
       "before we were innocent": "Psychological Fiction",
@@ -191,15 +191,30 @@
       "the drowning woman": "Psychological Suspense",
       "the three lives of cate kay": "Fiction / Drama",
       "the southern book club's guide to slaying vampires": "Horror / Dark Comedy",
+      "the southern book clubs guide to slaying vampires": "Horror / Dark Comedy",
       "theo of golden": "Inspirational Fiction",
       "anatomy of an alibi": "Legal Thriller",
       "bad mother": "Romantic Suspense"
     };
 
-    const guaranteedCovers = {
+    // Pre-mapped high-res CDN covers (No API call required, loads instantly)
+    const directIsbnCovers = {
+      "first lie wins": "https://covers.openlibrary.org/b/isbn/9780593492918-M.jpg",
+      "before we were innocent": "https://covers.openlibrary.org/b/isbn/9780593418574-M.jpg",
+      "just for the summer": "https://covers.openlibrary.org/b/isbn/9781538704431-M.jpg",
+      "mother-daughter murder night": "https://covers.openlibrary.org/b/isbn/9780063315204-M.jpg",
+      "twenty years later": "https://covers.openlibrary.org/b/isbn/9781496727190-M.jpg",
+      "i hope this finds you well": "https://covers.openlibrary.org/b/isbn/9780063378032-M.jpg",
+      "the only one left": "https://covers.openlibrary.org/b/isbn/9780593183229-M.jpg",
+      "husbands": "https://covers.openlibrary.org/b/isbn/9780385550604-M.jpg",
+      "the husbands": "https://covers.openlibrary.org/b/isbn/9780385550604-M.jpg",
+      "the drowning woman": "https://covers.openlibrary.org/b/isbn/9781538751503-M.jpg",
+      "the three lives of cate kay": "https://covers.openlibrary.org/b/isbn/9781982181512-M.jpg",
       "the southern book club's guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg",
-      "southern book club's guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg",
-      "the southern book club guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg"
+      "the southern book clubs guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg",
+      "theo of golden": "https://covers.openlibrary.org/b/isbn/9781954347007-M.jpg",
+      "anatomy of an alibi": "https://covers.openlibrary.org/b/isbn/9781250284488-M.jpg",
+      "bad mother": "https://covers.openlibrary.org/b/isbn/9781538725900-M.jpg"
     };
 
     let pastReads = [];
@@ -209,8 +224,6 @@
       { id: 3, title: "Remarkably Bright Creatures", author: "Shelby Van Pelt", suggestedBy: "David", genre: "Fiction", votes: 5, customCover: "" }
     ];
 
-    // Local community star ratings database
-    // Structure: { "first lie wins": { sum: 22, count: 5, userVote: 5 } }
     let ratingsDb = JSON.parse(localStorage.getItem('bbc_star_ratings') || '{}');
 
     let wheelMode = 'all';
@@ -223,6 +236,7 @@
     let spinTimeTotal = 0;
     let currentWinner = null;
 
+    // Cache cover URLs in local storage
     const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
 
     function createInlineSvgCover(title, author) {
@@ -283,6 +297,10 @@
       return result.map(s => s.replace(/^["']|["']$/g, '').trim());
     }
 
+    function normalizeTitle(t) {
+      return (t || '').toLowerCase().replace(/['"’]/g, '').trim();
+    }
+
     async function loadPastReadsFromSheet() {
       try {
         const res = await fetch(SHEET_CSV_URL);
@@ -309,7 +327,8 @@
             dateRead = '';
           }
 
-          let genre = (genreColIdx !== -1 && cols[genreColIdx]) ? cols[genreColIdx] : (genreDirectory[title.toLowerCase()] || "Fiction");
+          const norm = normalizeTitle(title);
+          let genre = (genreColIdx !== -1 && cols[genreColIdx]) ? cols[genreColIdx] : (genreDirectory[norm] || genreDirectory[title.toLowerCase()] || "Fiction");
           let customCover = (coverColIdx !== -1 && cols[coverColIdx]) ? formatCoverUrl(cols[coverColIdx]) : '';
           
           if (!customCover) {
@@ -318,6 +337,11 @@
             } else if (cols[2] && (cols[2].startsWith('http') || cols[2].includes('drive.google'))) {
               customCover = formatCoverUrl(cols[2]);
             }
+          }
+
+          // If no custom cover, check direct ISBN database
+          if (!customCover) {
+            customCover = directIsbnCovers[norm] || directIsbnCovers[title.toLowerCase()] || '';
           }
 
           parsed.push({
@@ -339,11 +363,9 @@
       renderArchive();
     }
 
-    // Community Star Rating Mechanics
     function getBookRatingData(title) {
       const key = title.toLowerCase().trim();
       if (!ratingsDb[key]) {
-        // Initialize with default base ratings
         const seedVotes = 4 + (title.length % 5);
         const seedAvg = 4.2 + (title.length % 7) * 0.1;
         ratingsDb[key] = {
@@ -369,11 +391,9 @@
       const item = ratingsDb[key];
       
       if (item.userVote && item.userVote > 0) {
-        // Update user's existing vote
         item.sum = item.sum - item.userVote + stars;
         item.userVote = stars;
       } else {
-        // Brand new vote
         item.sum += stars;
         item.count += 1;
         item.userVote = stars;
@@ -383,71 +403,61 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
-    async function fetchBookCoverAndGenre(book, idx) {
-      const lower = book.title.toLowerCase().trim();
-      const key = `${book.title}-${book.author}`.toLowerCase();
-      const badgeEl = document.getElementById(`genre-badge-${idx}`);
+    // Dynamic fetcher for novel recommendations not in initial list
+    async function fetchDynamicCover(book, idx) {
       const imgEl = document.getElementById(`archive-img-${idx}`);
+      const norm = normalizeTitle(book.title);
 
       if (book.customCover) {
         if (imgEl) imgEl.src = book.customCover;
         return;
       }
 
-      if (guaranteedCovers[lower]) {
-        if (imgEl) imgEl.src = guaranteedCovers[lower];
+      if (directIsbnCovers[norm]) {
+        if (imgEl) imgEl.src = directIsbnCovers[norm];
         return;
       }
 
+      const key = `${book.title}-${book.author}`.toLowerCase();
       if (coverCache[key]) {
-        if (imgEl) imgEl.src = coverCache[key].cover;
-        if (badgeEl && coverCache[key].genre && book.genre === 'Fiction') {
-          badgeEl.textContent = coverCache[key].genre;
-        }
+        if (imgEl) imgEl.src = coverCache[key];
         return;
       }
 
-      try {
-        const cleanQuery = `${book.title} ${book.author}`.replace(/[^\w\s]/gi, ' ');
-        const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
-        if (gbRes.ok) {
-          const data = await gbRes.json();
-          if (data.items && data.items.length > 0) {
-            const info = data.items[0].volumeInfo;
-            let img = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || "";
-            let apiGenre = info.categories ? info.categories[0].split('/')[0].trim() : "";
-            
-            if (img) {
-              img = img.replace('http://', 'https://').replace('&edge=curl', '');
-              coverCache[key] = { cover: img, genre: apiGenre };
-              localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
-              if (imgEl) imgEl.src = img;
-              if (badgeEl && apiGenre && book.genre === 'Fiction') {
-                badgeEl.textContent = apiGenre;
+      // Stagger search to prevent 429 rate limiting
+      setTimeout(async () => {
+        try {
+          const cleanQuery = `intitle:"${book.title}" inauthor:"${book.author}"`;
+          const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.items && data.items.length > 0) {
+              let img = data.items[0].volumeInfo?.imageLinks?.thumbnail || "";
+              if (img) {
+                img = img.replace('http://', 'https://').replace('&edge=curl', '');
+                coverCache[key] = img;
+                localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
+                if (imgEl) imgEl.src = img;
+                return;
               }
-              return;
             }
           }
-        }
-      } catch (err) {}
+        } catch (e) {}
 
-      try {
-        const cleanTitle = book.title.replace(/[^\w\s]/gi, ' ').trim();
-        const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(cleanTitle)}&limit=1`);
-        if (olRes.ok) {
-          const olData = await olRes.json();
-          if (olData.docs && olData.docs.length > 0 && olData.docs[0].cover_i) {
-            const imgUrl = `https://covers.openlibrary.org/b/id/${olData.docs[0].cover_i}-M.jpg`;
-            coverCache[key] = { cover: imgUrl, genre: '' };
-            localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
-            if (imgEl) imgEl.src = imgUrl;
-            return;
+        // Fallback to Open Library
+        try {
+          const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(book.title)}&author=${encodeURIComponent(book.author)}&limit=1`);
+          if (olRes.ok) {
+            const olData = await olRes.json();
+            if (olData.docs && olData.docs.length > 0 && olData.docs[0].cover_i) {
+              const imgUrl = `https://covers.openlibrary.org/b/id/${olData.docs[0].cover_i}-M.jpg`;
+              coverCache[key] = imgUrl;
+              localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
+              if (imgEl) imgEl.src = imgUrl;
+            }
           }
-        }
-      } catch (e) {}
-
-      const fallbackSvg = createInlineSvgCover(book.title, book.author);
-      if (imgEl) imgEl.src = fallbackSvg;
+        } catch (err) {}
+      }, (idx % 5) * 400);
     }
 
     function switchTab(tab) {
@@ -485,8 +495,9 @@
       container.innerHTML = filtered.map((b, idx) => {
         const ratingInfo = getBookRatingData(b.title);
         const safeTitle = b.title.replace(/'/g, "\\'");
+        const norm = normalizeTitle(b.title);
+        const initialCover = b.customCover || directIsbnCovers[norm] || directIsbnCovers[b.title.toLowerCase()] || createInlineSvgCover(b.title, b.author);
 
-        // Generate the 5 star buttons
         const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
           const isFilled = starNum <= (ratingInfo.userVote || Math.round(parseFloat(ratingInfo.avg)));
           const isUserVoted = starNum <= ratingInfo.userVote;
@@ -503,7 +514,7 @@
           <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-4 flex gap-4 hover:border-burnBlue transition shadow-lg">
             <img id="archive-img-${idx}" 
                  onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${b.author.replace(/'/g, "\\'")}')"
-                 src="${createInlineSvgCover(b.title, b.author)}" 
+                 src="${initialCover}" 
                  class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
             <div class="flex flex-col justify-between flex-1 min-w-0">
               <div>
@@ -514,7 +525,6 @@
                 <p class="text-xs text-cyan-200 truncate">${b.author}</p>
               </div>
               
-              <!-- Interactive Community Rating & Date -->
               <div class="mt-2 border-t border-[#002b82]/50 pt-2">
                 <div class="flex items-center justify-between gap-1 mb-1">
                   <div class="flex items-center gap-0.5">
@@ -530,7 +540,7 @@
                   </span>
                   ${b.dateRead ? `
                     <span class="text-cyan-200/90 font-medium flex items-center gap-1 bg-[#001744] px-1.5 py-0.5 rounded">
-                      🗓️ ${b.dateRead}
+                      🗓️️ ${b.dateRead}
                     </span>
                   ` : ''}
                 </div>
@@ -541,7 +551,7 @@
       }).join('');
 
       filtered.forEach((b, idx) => {
-        fetchBookCoverAndGenre(b, idx);
+        fetchDynamicCover(b, idx);
       });
     }
 
@@ -560,68 +570,40 @@
 
       const sorted = [...recommendations].sort((a, b) => b.votes - a.votes);
 
-      container.innerHTML = sorted.map((b) => `
-        <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition">
-          <div class="flex items-center gap-3 min-w-0">
-            <img id="rec-img-${b.id}" 
-                 onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
-                 class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
-                 src="${createInlineSvgCover(b.title, b.author)}" />
-            <div class="min-w-0">
-              <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-0.5">
-                ${b.genre || 'General Fiction'}
-              </span>
-              <h4 class="text-sm font-bold text-white truncate">${b.title}</h4>
-              <p class="text-xs text-cyan-200 truncate">${b.author}</p>
-              ${b.suggestedBy ? `<p class="text-[10px] text-slate-400">By: ${b.suggestedBy}</p>` : ''}
+      container.innerHTML = sorted.map((b) => {
+        const norm = normalizeTitle(b.title);
+        const coverSrc = b.customCover || directIsbnCovers[norm] || directIsbnCovers[b.title.toLowerCase()] || createInlineSvgCover(b.title, b.author);
+        return `
+          <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition">
+            <div class="flex items-center gap-3 min-w-0">
+              <img id="rec-img-${b.id}" 
+                   onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
+                   class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
+                   src="${coverSrc}" />
+              <div class="min-w-0">
+                <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-0.5">
+                  ${b.genre || 'General Fiction'}
+                </span>
+                <h4 class="text-sm font-bold text-white truncate">${b.title}</h4>
+                <p class="text-xs text-cyan-200 truncate">${b.author}</p>
+                ${b.suggestedBy ? `<p class="text-[10px] text-slate-400">By: ${b.suggestedBy}</p>` : ''}
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button onclick="upvoteRecommendation(${b.id})" title="Vote" class="flex items-center gap-1.5 bg-[#001744] hover:bg-midnight active:scale-95 text-candlelight px-3 py-1.5 rounded-lg border border-[#003399] transition">
+                <span class="text-xs font-semibold">▲</span>
+                <span class="text-sm font-bold">${b.votes}</span>
+              </button>
+              <button onclick="deleteRecommendation(${b.id})" title="Remove nominee" class="text-slate-400 hover:text-red-400 hover:bg-[#001744] p-1.5 rounded-lg transition active:scale-90">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
             </div>
           </div>
-
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <button onclick="upvoteRecommendation(${b.id})" title="Vote" class="flex items-center gap-1.5 bg-[#001744] hover:bg-midnight active:scale-95 text-candlelight px-3 py-1.5 rounded-lg border border-[#003399] transition">
-              <span class="text-xs font-semibold">▲</span>
-              <span class="text-sm font-bold">${b.votes}</span>
-            </button>
-            <button onclick="deleteRecommendation(${b.id})" title="Remove nominee" class="text-slate-400 hover:text-red-400 hover:bg-[#001744] p-1.5 rounded-lg transition active:scale-90">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      `).join('');
-
-      sorted.forEach(async (b) => {
-        const cover = b.customCover || (await fetchCoverOnly(b.title, b.author));
-        const img = document.getElementById(`rec-img-${b.id}`);
-        if (img) img.src = cover;
-      });
-    }
-
-    async function fetchCoverOnly(title, author) {
-      const lower = title.toLowerCase().trim();
-      if (guaranteedCovers[lower]) return guaranteedCovers[lower];
-
-      const key = `${title}-${author}`.toLowerCase();
-      if (coverCache[key]) return coverCache[key].cover || coverCache[key];
-
-      try {
-        const cleanQuery = `${title} ${author}`.replace(/[^\w\s]/gi, ' ');
-        const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
-        if (gbRes.ok) {
-          const data = await gbRes.json();
-          if (data.items && data.items.length > 0) {
-            let img = data.items[0].volumeInfo?.imageLinks?.thumbnail || "";
-            if (img) {
-              img = img.replace('http://', 'https://').replace('&edge=curl', '');
-              coverCache[key] = { cover: img, genre: '' };
-              return img;
-            }
-          }
-        }
-      } catch (e) {}
-
-      return createInlineSvgCover(title, author);
+        `;
+      }).join('');
     }
 
     async function handleNewRecommendation(e) {
@@ -795,7 +777,8 @@
         author: currentWinner.author,
         dateRead: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         customCover: currentWinner.customCover || '',
-        genre: currentWinner.genre || 'Club Pick'
+        genre: currentWinner.genre || 'Club Pick',
+        rating: 4.5
       });
       deleteRecommendation(currentWinner.id);
       document.getElementById('winnerCard').classList.add('hidden');
