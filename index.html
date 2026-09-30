@@ -197,7 +197,6 @@
       { id: 3, title: "Remarkably Bright Creatures", author: "Shelby Van Pelt", suggestedBy: "David", genre: "Fiction", votes: 5, customCover: "" }
     ];
 
-    // Wheel State
     let wheelMode = 'all';
     let currentWheelItems = [];
     let startAngle = 0;
@@ -210,6 +209,34 @@
 
     // Cache cover URLs in local storage
     const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
+
+    // Bulletproof inline SVG generator so covers NEVER show as broken images
+    function createInlineSvgCover(title, author) {
+      const cleanTitle = (title || 'Book').replace(/[<>&"']/g, '');
+      const cleanAuthor = (author || '').replace(/[<>&"']/g, '');
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="180" height="260" viewBox="0 0 180 260">
+          <defs>
+            <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#002063"/>
+              <stop offset="100%" stop-color="#00133b"/>
+            </linearGradient>
+          </defs>
+          <rect width="180" height="260" fill="url(#bg)" rx="8" stroke="#00B1E1" stroke-width="2"/>
+          <circle cx="90" cy="55" r="22" fill="#001744" stroke="#FDDA13" stroke-width="2"/>
+          <text x="90" y="62" font-size="20" text-anchor="middle">🔥</text>
+          <text x="90" y="125" fill="#ffffff" font-size="13" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" text-anchor="middle">
+            ${cleanTitle.length > 18 ? cleanTitle.slice(0, 16) + '...' : cleanTitle}
+          </text>
+          <text x="90" y="148" fill="#00B1E1" font-size="11" font-family="'Plus Jakarta Sans', sans-serif" font-weight="600" text-anchor="middle">
+            ${cleanAuthor.length > 20 ? cleanAuthor.slice(0, 18) + '...' : cleanAuthor}
+          </text>
+          <line x1="40" y1="165" x2="140" y2="165" stroke="#FDDA13" stroke-width="1.5" opacity="0.6"/>
+          <text x="90" y="235" fill="#FDDA13" font-size="9" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" text-anchor="middle" letter-spacing="1">BURN GYM READ</text>
+        </svg>
+      `;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`;
+    }
 
     function formatCoverUrl(url) {
       if (!url) return "";
@@ -250,7 +277,6 @@
         const lines = csvText.trim().split(/\r?\n/);
         const parsed = [];
 
-        // Check headers to support flexible columns
         const headerCols = lines[0] ? parseCSVLine(lines[0]).map(h => h.toLowerCase()) : [];
         const genreColIdx = headerCols.findIndex(h => h.includes('genre') || h.includes('category'));
         const coverColIdx = headerCols.findIndex(h => h.includes('cover') || h.includes('image') || h.includes('link') || h.includes('url'));
@@ -263,10 +289,7 @@
           const author = cols[1] || 'Unknown Author';
           if (!title) continue;
 
-          // Determine genre: 1. From Sheet Column, 2. From Directory, 3. General Fiction
-          let genre = (genreColIdx !== -1 && cols[genreColIdx]) ? cols[genreColIdx] : (genreDirectory[title.toLowerCase()] || "General Fiction");
-          
-          // Determine custom cover: From designated column, or column 3 if it looks like a URL
+          let genre = (genreColIdx !== -1 && cols[genreColIdx]) ? cols[genreColIdx] : (genreDirectory[title.toLowerCase()] || "Fiction");
           let customCover = (coverColIdx !== -1 && cols[coverColIdx]) ? formatCoverUrl(cols[coverColIdx]) : '';
           if (!customCover && cols[2] && (cols[2].startsWith('http') || cols[2].includes('drive.google'))) {
             customCover = formatCoverUrl(cols[2]);
@@ -303,55 +326,30 @@
 
       if (coverCache[key]) {
         if (imgEl) imgEl.src = coverCache[key].cover;
-        if (badgeEl && book.genre === 'General Fiction' && coverCache[key].genre) {
+        if (badgeEl && coverCache[key].genre && book.genre === 'Fiction') {
           badgeEl.textContent = coverCache[key].genre;
         }
         return;
       }
 
-      // 1. Try Open Library
+      // Query Google Books API directly by title and author
       try {
-        const qTitle = encodeURIComponent(book.title.trim());
-        const qAuthor = encodeURIComponent(book.author.trim());
-        const olRes = await fetch(`https://openlibrary.org/search.json?title=${qTitle}&author=${qAuthor}&limit=1`);
-        if (olRes.ok) {
-          const olData = await olRes.json();
-          if (olData.docs && olData.docs.length > 0) {
-            const doc = olData.docs[0];
-            let imgUrl = doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '';
-            let apiGenre = (doc.subject && doc.subject.length > 0) ? doc.subject.slice(0, 2).join(' / ') : '';
-
-            if (imgUrl) {
-              coverCache[key] = { cover: imgUrl, genre: apiGenre };
-              localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
-              if (imgEl) imgEl.src = imgUrl;
-              if (badgeEl && book.genre === 'General Fiction' && apiGenre) {
-                badgeEl.textContent = apiGenre;
-              }
-              return;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Open Library fetch error:", e);
-      }
-
-      // 2. Try Google Books API Fallback
-      try {
-        const query = encodeURIComponent(`${book.title} ${book.author}`);
-        const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1`);
+        const cleanQuery = `${book.title} ${book.author}`.replace(/[^\w\s]/gi, ' ');
+        const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
         if (gbRes.ok) {
           const data = await gbRes.json();
           if (data.items && data.items.length > 0) {
             const info = data.items[0].volumeInfo;
             let img = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || "";
-            let apiGenre = info.categories ? info.categories[0] : "";
+            let apiGenre = info.categories ? info.categories[0].split('/')[0].trim() : "";
+            
             if (img) {
-              img = img.replace("http://", "https://");
+              // Ensure https and strip zoom parameters that sometimes cause Google Books 403s
+              img = img.replace('http://', 'https://').replace('&edge=curl', '');
               coverCache[key] = { cover: img, genre: apiGenre };
               localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
               if (imgEl) imgEl.src = img;
-              if (badgeEl && book.genre === 'General Fiction' && apiGenre) {
+              if (badgeEl && apiGenre && book.genre === 'Fiction') {
                 badgeEl.textContent = apiGenre;
               }
               return;
@@ -362,8 +360,24 @@
         console.warn("Google Books fetch error:", err);
       }
 
-      // Fallback placeholder card
-      if (imgEl) imgEl.src = `https://placehold.co/180x260/002063/00B1E1?text=${encodeURIComponent(book.title)}`;
+      // Second attempt: Open Library search
+      try {
+        const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(book.title)}&limit=1`);
+        if (olRes.ok) {
+          const olData = await olRes.json();
+          if (olData.docs && olData.docs.length > 0 && olData.docs[0].cover_i) {
+            const imgUrl = `https://covers.openlibrary.org/b/id/${olData.docs[0].cover_i}-M.jpg`;
+            coverCache[key] = { cover: imgUrl, genre: '' };
+            localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
+            if (imgEl) imgEl.src = imgUrl;
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // Robust SVG fallback that never breaks
+      const fallbackSvg = createInlineSvgCover(book.title, book.author);
+      if (imgEl) imgEl.src = fallbackSvg;
     }
 
     function switchTab(tab) {
@@ -399,7 +413,9 @@
 
       container.innerHTML = filtered.map((b, idx) => `
         <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-4 flex gap-4 hover:border-burnBlue transition shadow-lg">
-          <img id="archive-img-${idx}" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='120'%3E%3Crect width='100%25' height='100%25' fill='%23001744'/%3E%3C/svg%3E" 
+          <img id="archive-img-${idx}" 
+               onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
+               src="${createInlineSvgCover(b.title, b.author)}" 
                class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
           <div class="flex flex-col justify-between flex-1 min-w-0">
             <div>
@@ -440,8 +456,10 @@
       container.innerHTML = sorted.map((b) => `
         <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition">
           <div class="flex items-center gap-3 min-w-0">
-            <img id="rec-img-${b.id}" class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
-                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Crect width='100%25' height='100%25' fill='%23001744'/%3E%3C/svg%3E" />
+            <img id="rec-img-${b.id}" 
+                 onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
+                 class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
+                 src="${createInlineSvgCover(b.title, b.author)}" />
             <div class="min-w-0">
               <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-0.5">
                 ${b.genre || 'General Fiction'}
@@ -478,16 +496,22 @@
       if (coverCache[key]) return coverCache[key].cover || coverCache[key];
 
       try {
-        const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=1`);
-        const data = await olRes.json();
-        if (data.docs && data.docs[0]?.cover_i) {
-          const url = `https://covers.openlibrary.org/b/id/${data.docs[0].cover_i}-M.jpg`;
-          coverCache[key] = { cover: url, genre: '' };
-          return url;
+        const cleanQuery = `${title} ${author}`.replace(/[^\w\s]/gi, ' ');
+        const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
+        if (gbRes.ok) {
+          const data = await gbRes.json();
+          if (data.items && data.items.length > 0) {
+            let img = data.items[0].volumeInfo?.imageLinks?.thumbnail || "";
+            if (img) {
+              img = img.replace('http://', 'https://').replace('&edge=curl', '');
+              coverCache[key] = { cover: img, genre: '' };
+              return img;
+            }
+          }
         }
       } catch (e) {}
 
-      return `https://placehold.co/180x260/002063/00B1E1?text=${encodeURIComponent(title)}`;
+      return createInlineSvgCover(title, author);
     }
 
     async function handleNewRecommendation(e) {
@@ -534,7 +558,6 @@
       updateWheelItems();
     }
 
-    // Official Burn Gym Palette for wheel slices
     const wheelColors = ["#00B1E1", "#002063", "#FDDA13", "#008db5", "#003aa3", "#d4b300"];
 
     function loadWheelMode(mode) {
@@ -592,7 +615,6 @@
         ctx.fill();
 
         ctx.save();
-        // Contrast text color depending on slice background
         ctx.fillStyle = (sliceColor === "#FDDA13" || sliceColor === "#00B1E1") ? "#002063" : "#ffffff";
         ctx.translate(
           160 + Math.cos(angle + arc / 2) * textRadius,
