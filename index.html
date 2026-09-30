@@ -169,7 +169,7 @@
               🎡 Spin to Choose!
             </button>
 
-            <!-- Winner announcement card -->
+            <!-- Winner announcement card with Month & Year Dropdowns -->
             <div id="winnerCard" class="hidden mt-4 w-full bg-[#001a52] border-2 border-candlelight p-5 rounded-xl text-center shadow-2xl">
               <span class="text-xs uppercase font-extrabold tracking-wider text-candlelight">Next Book Club Pick</span>
               <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1 break-words">Book Title</h4>
@@ -244,7 +244,7 @@
           <span>📖 Book Overview & Synopsis</span>
           <span id="modalPages" class="text-cyan-300/80 font-normal"></span>
         </div>
-        <div id="modalSynopsisText" class="text-xs md:text-sm text-slate-300 whitespace-pre-line">
+        <div id="modalSynopsisText" class="text-xs md:text-sm text-slate-300 whitespace-pre-line leading-relaxed">
           Loading synopsis...
         </div>
       </div>
@@ -368,6 +368,13 @@
         return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
       }
       return trimmed;
+    }
+
+    // Helper to sanitize HTML tags and entities from API descriptions
+    function sanitizeDescription(rawHtml) {
+      if (!rawHtml) return "";
+      const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
+      return doc.body.textContent || doc.body.innerText || "";
     }
 
     async function fetchAppData() {
@@ -601,7 +608,6 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
-    // CLICKABLE NOMINEES: Opens Synopsis Modal on card click
     async function renderRecommendations() {
       const container = document.getElementById('recList');
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
@@ -637,7 +643,6 @@
               </div>
             </div>
 
-            <!-- Action buttons: event.stopPropagation() prevents opening modal when voting/deleting -->
             <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
               <button onclick="upvoteRecommendation('${b.id}')" title="Vote" class="flex items-center gap-1.5 bg-[#001744] hover:bg-midnight active:scale-95 text-candlelight px-3 py-1.5 rounded-lg border border-[#003399] transition">
                 <span class="text-xs font-semibold">▲</span>
@@ -654,7 +659,7 @@
       }).join('');
     }
 
-    // AUTO-FETCH & DISPLAY SYNOPSIS MODAL
+    // Google Books API query with projection=full and HTML sanitization
     async function openSynopsisModal(nomineeId) {
       const book = recommendations.find(r => String(r.id) === String(nomineeId));
       if (!book) return;
@@ -671,7 +676,7 @@
       document.getElementById('modalSynopsisText').innerHTML = `
         <div class="flex items-center gap-2 py-6 text-cyan-300">
           <span class="w-2 h-2 rounded-full bg-burnBlue animate-ping"></span>
-          <span>Fetching synopsis...</span>
+          <span>Fetching full synopsis from Google Books...</span>
         </div>
       `;
 
@@ -686,27 +691,28 @@
         return;
       }
 
-      // Fetch from Google Books API
       try {
         const cleanQuery = `intitle:"${book.title}" inauthor:"${book.author}"`;
-        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
+        // Include projection=full to ensure full overview text is returned
+        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&projection=full&maxResults=1`);
         if (res.ok) {
           const data = await res.json();
-          if (data.items && data.items.length > 0) {
-            const info = data.items[0].volumeInfo;
-            let description = info.description || "";
-            // Clean up any stray HTML formatting tags from Google Books descriptions
-            description = description.replace(/<\/?[^>]+(>|$)/g, "");
+          const info = data.items?.[0]?.volumeInfo;
 
-            if (description) {
+          if (info) {
+            const rawDescription = info.description || "";
+            const cleanText = sanitizeDescription(rawDescription);
+            const pageCount = info.pageCount || null;
+
+            if (cleanText) {
               synopsisCache[cacheKey] = {
-                description: description,
-                pageCount: info.pageCount || null
+                description: cleanText,
+                pageCount: pageCount
               };
               localStorage.setItem('bbc_synopsis_cache', JSON.stringify(synopsisCache));
-              document.getElementById('modalSynopsisText').textContent = description;
-              if (info.pageCount) {
-                document.getElementById('modalPages').textContent = `${info.pageCount} pages`;
+              document.getElementById('modalSynopsisText').textContent = cleanText;
+              if (pageCount) {
+                document.getElementById('modalPages').textContent = `${pageCount} pages`;
               }
               return;
             }
@@ -716,7 +722,7 @@
         console.warn("Could not fetch synopsis from Google Books:", err);
       }
 
-      // Fallback: If no synopsis is indexed online
+      // Fallback message
       document.getElementById('modalSynopsisText').innerHTML = `
         <p class="italic text-slate-400">
           No publisher synopsis was found online for this edition, but it was recommended as a <strong class="text-candlelight">${book.genre || 'great read'}</strong>!
@@ -728,7 +734,6 @@
       document.getElementById('synopsisModal').classList.add('hidden');
     }
 
-    // Close modal if user clicks outside of modal container
     window.addEventListener('click', (e) => {
       const modal = document.getElementById('synopsisModal');
       if (e.target === modal) {
