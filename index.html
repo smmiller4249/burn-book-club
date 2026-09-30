@@ -74,10 +74,10 @@
               Live Sheet Connected
             </span>
           </div>
-          <p class="text-sm text-cyan-100/70">The top card highlighted in yellow is our current book!</p>
+          <p class="text-sm text-cyan-100/70">Dates reflect Meeting Month from Column C. Tap stars to rate!</p>
         </div>
         <div class="relative">
-          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, genre, or date..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
+          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, genre, or month..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
         </div>
       </div>
 
@@ -169,7 +169,7 @@
               <button id="chooseBtn" onclick="markAsReadFromWinner()" class="w-full bg-gradient-to-r from-candlelight to-amber-400 hover:from-yellow-300 hover:to-candlelight text-midnight font-extrabold py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
                 <span>✅ Choose This Book & Save to Sheet</span>
               </button>
-              <p class="text-[10px] text-cyan-300/70 mt-2">Appends row with current month/year to your Google Sheet</p>
+              <p class="text-[10px] text-cyan-300/70 mt-2">Appends row with current month/year to Column C (Meeting Month)</p>
             </div>
           </div>
         </div>
@@ -181,11 +181,11 @@
 
   <script>
     // -------------------------------------------------------------
-    // REPLACE WITH YOUR GOOGLE APPS SCRIPT WEB APP URL FROM STEP 2
+    // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
     // -------------------------------------------------------------
     const SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbwoyKzLW-QWXpHg5bhoTcupQ6vxpKxwx0PmIgU2p7ISJHWyRiI5JQaAcwNtyRfvIR4/exec";
 
-    // Direct ISBN covers for instant rendering without rate limits
+    // Direct ISBN covers for instant rendering
     const directIsbnCovers = {
       "first lie wins": "https://covers.openlibrary.org/b/isbn/9780593492918-M.jpg",
       "before we were innocent": "https://covers.openlibrary.org/b/isbn/9780593418574-M.jpg",
@@ -205,6 +205,24 @@
       "bad mother": "https://covers.openlibrary.org/b/isbn/9781538725900-M.jpg"
     };
 
+    const genreDirectory = {
+      "first lie wins": "Mystery / Thriller",
+      "before we were innocent": "Psychological Fiction",
+      "just for the summer": "Romance / Contemporary",
+      "mother-daughter murder night": "Whodunit / Mystery",
+      "twenty years later": "Crime Thriller",
+      "i hope this finds you well": "Workplace Humor",
+      "the only one left": "Gothic Thriller",
+      "husbands": "Speculative / Comedy",
+      "the drowning woman": "Psychological Suspense",
+      "the three lives of cate kay": "Fiction / Drama",
+      "the southern book club's guide to slaying vampires": "Horror / Dark Comedy",
+      "the southern book clubs guide to slaying vampires": "Horror / Dark Comedy",
+      "theo of golden": "Inspirational Fiction",
+      "anatomy of an alibi": "Legal Thriller",
+      "bad mother": "Romantic Suspense"
+    };
+
     let pastReads = [];
     let recommendations = [];
     let ratingsDb = JSON.parse(localStorage.getItem('bbc_star_ratings') || '{}');
@@ -218,8 +236,6 @@
     let spinTime = 0;
     let spinTimeTotal = 0;
     let currentWinner = null;
-
-    const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
 
     function createInlineSvgCover(title, author) {
       const cleanTitle = (title || 'Book').replace(/[<>&"']/g, '');
@@ -264,7 +280,18 @@
       return (t || '').toLowerCase().replace(/['"’]/g, '').trim();
     }
 
-    // Fetch shared database from Google Apps Script
+    // Cleans dates (handles raw timestamps like 2024-03-01T00:00:00.000Z -> March 2024)
+    function cleanMeetingMonth(str) {
+      if (!str) return "";
+      const trimmed = str.trim();
+      if (trimmed.includes("T") && !isNaN(Date.parse(trimmed))) {
+        const d = new Date(trimmed);
+        return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      }
+      return trimmed;
+    }
+
+    // Fetch shared live database from Apps Script
     async function fetchAppData() {
       try {
         const res = await fetch(SCRIPT_API_URL);
@@ -275,7 +302,7 @@
         renderRecommendations();
         updateWheelItems();
       } catch (err) {
-        console.warn("Using offline mode, could not connect to Apps Script:", err);
+        console.warn("Could not reach Apps Script endpoint:", err);
       }
     }
 
@@ -335,13 +362,13 @@
       }
     }
 
-    // Render Archive with Current Book Highlight
+    // Render Archive with Column C Meeting Month & Current Book Highlight
     async function renderArchive(filter = "") {
       const container = document.getElementById('archiveGrid');
       const filtered = pastReads.filter(b => 
         b.title.toLowerCase().includes(filter.toLowerCase()) || 
         b.author.toLowerCase().includes(filter.toLowerCase()) ||
-        (b.dateRead && b.dateRead.toLowerCase().includes(filter.toLowerCase()))
+        (b.meetingMonth && b.meetingMonth.toLowerCase().includes(filter.toLowerCase()))
       );
 
       if (filtered.length === 0) {
@@ -349,7 +376,7 @@
         return;
       }
 
-      // The last entry in the sheet is considered the most recent book
+      // The last row in Sheet1 is the most recent book
       const currentBookIndex = filtered.length - 1;
 
       container.innerHTML = filtered.map((b, idx) => {
@@ -358,6 +385,8 @@
         const norm = normalizeTitle(b.title);
         const initialCover = b.cover || directIsbnCovers[norm] || createInlineSvgCover(b.title, b.author);
         const isCurrentBook = (idx === currentBookIndex && !filter);
+        const meetingMonthText = cleanMeetingMonth(b.meetingMonth);
+        const genreText = genreDirectory[norm] || "Club Read";
 
         const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
           const isFilled = starNum <= (ratingInfo.userVote || Math.round(parseFloat(ratingInfo.avg)));
@@ -389,7 +418,7 @@
                   </span>
                 ` : `
                   <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1">
-                    Past Read
+                    ${genreText}
                   </span>
                 `}
                 <h4 class="text-sm font-bold text-white leading-snug break-words" title="${b.title}">${b.title}</h4>
@@ -409,9 +438,9 @@
                   <span class="text-[10px] text-cyan-300/60">
                     ${ratingInfo.userVote ? `You voted: ${ratingInfo.userVote}★` : 'Tap star to rate'}
                   </span>
-                  ${b.dateRead ? `
+                  ${meetingMonthText ? `
                     <span class="text-cyan-200/90 font-medium flex items-center gap-1 bg-[#001744] px-1.5 py-0.5 rounded border border-[#003399]">
-                      🗓 ${b.dateRead}
+                      🗓 ${meetingMonthText}
                     </span>
                   ` : ''}
                 </div>
@@ -426,7 +455,7 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
-    // Shared Nominees & Live Upvoting
+    // Live Nominees & Upvoting
     async function renderRecommendations() {
       const container = document.getElementById('recList');
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
@@ -493,14 +522,12 @@
         customCover
       };
 
-      // Optimistic instant UI update
       const tempId = String(Date.now());
       recommendations.unshift({ id: tempId, title, author, suggestedBy, genre, customCover, votes: 1 });
       renderRecommendations();
       updateWheelItems();
       document.getElementById('recForm').reset();
 
-      // Post to Google Apps Script
       fetch(SCRIPT_API_URL, {
         method: "POST",
         mode: "no-cors",
@@ -659,7 +686,7 @@
       return b + c * (tc + -3 * ts + 3 * t);
     }
 
-    // Save picked book to Google Sheet with Month/Year
+    // Save chosen book to Sheet1 with Meeting Month in Column C
     async function markAsReadFromWinner() {
       if (!currentWinner) return;
 
@@ -669,20 +696,18 @@
 
       const now = new Date();
       const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-      const dateStr = `${months[now.getMonth()]} ${now.getFullYear()}`;
+      const monthYear = `${months[now.getMonth()]} ${now.getFullYear()}`;
 
-      // Optimistically push to local pastReads
+      // Optimistically push to local pastReads with Column C Meeting Month
       pastReads.push({
         title: currentWinner.title,
         author: currentWinner.author,
-        dateRead: dateStr,
+        meetingMonth: monthYear,
         cover: currentWinner.customCover || ''
       });
 
-      // Remove from local recommendations
       recommendations = recommendations.filter(r => String(r.id) !== String(currentWinner.id));
 
-      // Post back to Google Apps Script to write row in Sheet
       try {
         await fetch(SCRIPT_API_URL, {
           method: "POST",
@@ -710,7 +735,6 @@
       switchTab('archive');
     }
 
-    // Polling interval: refreshes nominees & reads every 30 seconds for gym members
     fetchAppData();
     setInterval(fetchAppData, 30000);
   </script>
