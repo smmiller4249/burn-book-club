@@ -71,7 +71,7 @@
           <p class="text-sm text-cyan-100/70">Archive automatically updated from your Google Sheet</p>
         </div>
         <div class="relative">
-          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, or genre..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
+          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, genre, or date..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
         </div>
       </div>
 
@@ -89,7 +89,7 @@
         <div class="lg:col-span-7 space-y-6">
           <div class="bg-midnight/70 border border-[#002b82] rounded-2xl p-6 shadow-xl backdrop-blur">
             <h3 class="text-lg font-bold text-white mb-1">Suggest a Book</h3>
-            <p class="text-xs text-cyan-200 mb-4">No login required. Submit a title & author; cover art and genre tags populate automatically!</p>
+            <p class="text-xs text-cyan-200 mb-4">No login required. Submit a title & author; cover art and genre populate automatically!</p>
             <form id="recForm" onsubmit="handleNewRecommendation(event)" class="space-y-3">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -172,7 +172,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTglAzQPF6Bgza9BxOatXJqeNfgBw6uES2Lfb_DwBcM9-RWjSy8ICHpnaD-e7wbMQm9foZR84-pUbc8/pub?output=csv";
 
-    // Known genres for seed books (used if Google Sheet doesn't specify one)
+    // Known genres for seed books
     const genreDirectory = {
       "first lie wins": "Mystery / Thriller",
       "before we were innocent": "Psychological Fiction",
@@ -188,6 +188,13 @@
       "theo of golden": "Inspirational Fiction",
       "anatomy of an alibi": "Legal Thriller",
       "bad mother": "Romantic Suspense"
+    };
+
+    // Guaranteed known direct cover URLs for tricky titles
+    const guaranteedCovers = {
+      "the southern book club's guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg",
+      "southern book club's guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg",
+      "the southern book club guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg"
     };
 
     let pastReads = [];
@@ -207,10 +214,8 @@
     let spinTimeTotal = 0;
     let currentWinner = null;
 
-    // Cache cover URLs in local storage
     const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
 
-    // Bulletproof inline SVG generator so covers NEVER show as broken images
     function createInlineSvgCover(title, author) {
       const cleanTitle = (title || 'Book').replace(/[<>&"']/g, '');
       const cleanAuthor = (author || '').replace(/[<>&"']/g, '');
@@ -277,7 +282,9 @@
         const lines = csvText.trim().split(/\r?\n/);
         const parsed = [];
 
+        // Check header row for dynamic indices
         const headerCols = lines[0] ? parseCSVLine(lines[0]).map(h => h.toLowerCase()) : [];
+        const dateColIdx = headerCols.findIndex(h => h.includes('date') || h.includes('month') || h.includes('read'));
         const genreColIdx = headerCols.findIndex(h => h.includes('genre') || h.includes('category'));
         const coverColIdx = headerCols.findIndex(h => h.includes('cover') || h.includes('image') || h.includes('link') || h.includes('url'));
 
@@ -289,15 +296,30 @@
           const author = cols[1] || 'Unknown Author';
           if (!title) continue;
 
+          // Date from Column C (or auto-detected header)
+          let dateRead = (dateColIdx !== -1 && cols[dateColIdx]) ? cols[dateColIdx] : (cols[2] || '');
+          
+          // If col 2 was actually an image link, don't treat it as date
+          if (dateRead.startsWith('http') || dateRead.includes('drive.google')) {
+            dateRead = '';
+          }
+
           let genre = (genreColIdx !== -1 && cols[genreColIdx]) ? cols[genreColIdx] : (genreDirectory[title.toLowerCase()] || "Fiction");
           let customCover = (coverColIdx !== -1 && cols[coverColIdx]) ? formatCoverUrl(cols[coverColIdx]) : '';
-          if (!customCover && cols[2] && (cols[2].startsWith('http') || cols[2].includes('drive.google'))) {
-            customCover = formatCoverUrl(cols[2]);
+          
+          // Check if Column D or C has a direct image URL
+          if (!customCover) {
+            if (cols[3] && (cols[3].startsWith('http') || cols[3].includes('drive.google'))) {
+              customCover = formatCoverUrl(cols[3]);
+            } else if (cols[2] && (cols[2].startsWith('http') || cols[2].includes('drive.google'))) {
+              customCover = formatCoverUrl(cols[2]);
+            }
           }
 
           parsed.push({
             title,
             author,
+            dateRead,
             genre,
             customCover,
             rating: (4.0 + (title.length % 9) * 0.1).toFixed(1)
@@ -315,15 +337,24 @@
     }
 
     async function fetchBookCoverAndGenre(book, idx) {
+      const lower = book.title.toLowerCase().trim();
       const key = `${book.title}-${book.author}`.toLowerCase();
       const badgeEl = document.getElementById(`genre-badge-${idx}`);
       const imgEl = document.getElementById(`archive-img-${idx}`);
 
+      // 1. Direct custom cover provided in Sheet
       if (book.customCover) {
         if (imgEl) imgEl.src = book.customCover;
         return;
       }
 
+      // 2. Built-in guaranteed override
+      if (guaranteedCovers[lower]) {
+        if (imgEl) imgEl.src = guaranteedCovers[lower];
+        return;
+      }
+
+      // 3. Local cached result
       if (coverCache[key]) {
         if (imgEl) imgEl.src = coverCache[key].cover;
         if (badgeEl && coverCache[key].genre && book.genre === 'Fiction') {
@@ -332,7 +363,7 @@
         return;
       }
 
-      // Query Google Books API directly by title and author
+      // 4. Google Books API with clean sanitization
       try {
         const cleanQuery = `${book.title} ${book.author}`.replace(/[^\w\s]/gi, ' ');
         const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
@@ -344,7 +375,6 @@
             let apiGenre = info.categories ? info.categories[0].split('/')[0].trim() : "";
             
             if (img) {
-              // Ensure https and strip zoom parameters that sometimes cause Google Books 403s
               img = img.replace('http://', 'https://').replace('&edge=curl', '');
               coverCache[key] = { cover: img, genre: apiGenre };
               localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
@@ -356,13 +386,12 @@
             }
           }
         }
-      } catch (err) {
-        console.warn("Google Books fetch error:", err);
-      }
+      } catch (err) {}
 
-      // Second attempt: Open Library search
+      // 5. Open Library Search
       try {
-        const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(book.title)}&limit=1`);
+        const cleanTitle = book.title.replace(/[^\w\s]/gi, ' ').trim();
+        const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(cleanTitle)}&limit=1`);
         if (olRes.ok) {
           const olData = await olRes.json();
           if (olData.docs && olData.docs.length > 0 && olData.docs[0].cover_i) {
@@ -375,7 +404,7 @@
         }
       } catch (e) {}
 
-      // Robust SVG fallback that never breaks
+      // 6. Inline SVG fallback
       const fallbackSvg = createInlineSvgCover(book.title, book.author);
       if (imgEl) imgEl.src = fallbackSvg;
     }
@@ -403,7 +432,8 @@
       const filtered = pastReads.filter(b => 
         b.title.toLowerCase().includes(filter.toLowerCase()) || 
         b.author.toLowerCase().includes(filter.toLowerCase()) ||
-        b.genre.toLowerCase().includes(filter.toLowerCase())
+        b.genre.toLowerCase().includes(filter.toLowerCase()) ||
+        (b.dateRead && b.dateRead.toLowerCase().includes(filter.toLowerCase()))
       );
 
       if (filtered.length === 0) {
@@ -425,9 +455,16 @@
               <h4 class="text-sm font-bold text-white truncate" title="${b.title}">${b.title}</h4>
               <p class="text-xs text-cyan-200 truncate">${b.author}</p>
             </div>
-            <div class="flex items-center justify-between text-xs text-slate-400 mt-2">
+            
+            <div class="flex items-center justify-between text-xs text-slate-400 mt-2 border-t border-[#002b82]/50 pt-2">
               <span class="text-candlelight font-bold">★ ${b.rating}</span>
-              <span class="text-[11px] text-cyan-300/60 font-medium">Read</span>
+              ${b.dateRead ? `
+                <span class="text-[11px] text-cyan-200/90 font-medium flex items-center gap-1 bg-[#001744] px-1.5 py-0.5 rounded">
+                  🗓️ ${b.dateRead}
+                </span>
+              ` : `
+                <span class="text-[11px] text-cyan-300/60 font-medium">Read</span>
+              `}
             </div>
           </div>
         </div>
@@ -492,6 +529,9 @@
     }
 
     async function fetchCoverOnly(title, author) {
+      const lower = title.toLowerCase().trim();
+      if (guaranteedCovers[lower]) return guaranteedCovers[lower];
+
       const key = `${title}-${author}`.toLowerCase();
       if (coverCache[key]) return coverCache[key].cover || coverCache[key];
 
@@ -684,6 +724,7 @@
       pastReads.unshift({
         title: currentWinner.title,
         author: currentWinner.author,
+        dateRead: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         customCover: currentWinner.customCover || '',
         genre: currentWinner.genre || 'Club Pick',
         rating: 4.5
