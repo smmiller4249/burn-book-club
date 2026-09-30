@@ -32,6 +32,12 @@
       border-right: 14px solid transparent;
       border-top: 24px solid #FDDA13;
     }
+    .star-btn {
+      transition: transform 0.15s ease, color 0.15s ease;
+    }
+    .star-btn:hover {
+      transform: scale(1.2);
+    }
   </style>
 </head>
 <body class="bg-[#00133b] text-slate-100 min-h-screen pb-20">
@@ -68,7 +74,7 @@
               Live Sheet Synced
             </span>
           </div>
-          <p class="text-sm text-cyan-100/70">Archive automatically updated from your Google Sheet</p>
+          <p class="text-sm text-cyan-100/70">Tap any star to cast or update your rating for that book!</p>
         </div>
         <div class="relative">
           <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, genre, or date..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
@@ -190,7 +196,6 @@
       "bad mother": "Romantic Suspense"
     };
 
-    // Guaranteed known direct cover URLs for tricky titles
     const guaranteedCovers = {
       "the southern book club's guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg",
       "southern book club's guide to slaying vampires": "https://covers.openlibrary.org/b/isbn/9781683691433-M.jpg",
@@ -203,6 +208,10 @@
       { id: 2, title: "The Maidens", author: "Alex Michaelides", suggestedBy: "Elena", genre: "Psychological Thriller", votes: 2, customCover: "" },
       { id: 3, title: "Remarkably Bright Creatures", author: "Shelby Van Pelt", suggestedBy: "David", genre: "Fiction", votes: 5, customCover: "" }
     ];
+
+    // Local community star ratings database
+    // Structure: { "first lie wins": { sum: 22, count: 5, userVote: 5 } }
+    let ratingsDb = JSON.parse(localStorage.getItem('bbc_star_ratings') || '{}');
 
     let wheelMode = 'all';
     let currentWheelItems = [];
@@ -282,7 +291,6 @@
         const lines = csvText.trim().split(/\r?\n/);
         const parsed = [];
 
-        // Check header row for dynamic indices
         const headerCols = lines[0] ? parseCSVLine(lines[0]).map(h => h.toLowerCase()) : [];
         const dateColIdx = headerCols.findIndex(h => h.includes('date') || h.includes('month') || h.includes('read'));
         const genreColIdx = headerCols.findIndex(h => h.includes('genre') || h.includes('category'));
@@ -296,10 +304,7 @@
           const author = cols[1] || 'Unknown Author';
           if (!title) continue;
 
-          // Date from Column C (or auto-detected header)
           let dateRead = (dateColIdx !== -1 && cols[dateColIdx]) ? cols[dateColIdx] : (cols[2] || '');
-          
-          // If col 2 was actually an image link, don't treat it as date
           if (dateRead.startsWith('http') || dateRead.includes('drive.google')) {
             dateRead = '';
           }
@@ -307,7 +312,6 @@
           let genre = (genreColIdx !== -1 && cols[genreColIdx]) ? cols[genreColIdx] : (genreDirectory[title.toLowerCase()] || "Fiction");
           let customCover = (coverColIdx !== -1 && cols[coverColIdx]) ? formatCoverUrl(cols[coverColIdx]) : '';
           
-          // Check if Column D or C has a direct image URL
           if (!customCover) {
             if (cols[3] && (cols[3].startsWith('http') || cols[3].includes('drive.google'))) {
               customCover = formatCoverUrl(cols[3]);
@@ -321,8 +325,7 @@
             author,
             dateRead,
             genre,
-            customCover,
-            rating: (4.0 + (title.length % 9) * 0.1).toFixed(1)
+            customCover
           });
         }
 
@@ -336,25 +339,66 @@
       renderArchive();
     }
 
+    // Community Star Rating Mechanics
+    function getBookRatingData(title) {
+      const key = title.toLowerCase().trim();
+      if (!ratingsDb[key]) {
+        // Initialize with default base ratings
+        const seedVotes = 4 + (title.length % 5);
+        const seedAvg = 4.2 + (title.length % 7) * 0.1;
+        ratingsDb[key] = {
+          sum: Math.round(seedAvg * seedVotes),
+          count: seedVotes,
+          userVote: 0
+        };
+      }
+      const data = ratingsDb[key];
+      const avg = data.count > 0 ? (data.sum / data.count).toFixed(1) : "0.0";
+      return {
+        avg,
+        count: data.count,
+        userVote: data.userVote || 0
+      };
+    }
+
+    function voteBookRating(title, stars) {
+      const key = title.toLowerCase().trim();
+      if (!ratingsDb[key]) {
+        getBookRatingData(title);
+      }
+      const item = ratingsDb[key];
+      
+      if (item.userVote && item.userVote > 0) {
+        // Update user's existing vote
+        item.sum = item.sum - item.userVote + stars;
+        item.userVote = stars;
+      } else {
+        // Brand new vote
+        item.sum += stars;
+        item.count += 1;
+        item.userVote = stars;
+      }
+
+      localStorage.setItem('bbc_star_ratings', JSON.stringify(ratingsDb));
+      renderArchive(document.getElementById('archiveSearch').value);
+    }
+
     async function fetchBookCoverAndGenre(book, idx) {
       const lower = book.title.toLowerCase().trim();
       const key = `${book.title}-${book.author}`.toLowerCase();
       const badgeEl = document.getElementById(`genre-badge-${idx}`);
       const imgEl = document.getElementById(`archive-img-${idx}`);
 
-      // 1. Direct custom cover provided in Sheet
       if (book.customCover) {
         if (imgEl) imgEl.src = book.customCover;
         return;
       }
 
-      // 2. Built-in guaranteed override
       if (guaranteedCovers[lower]) {
         if (imgEl) imgEl.src = guaranteedCovers[lower];
         return;
       }
 
-      // 3. Local cached result
       if (coverCache[key]) {
         if (imgEl) imgEl.src = coverCache[key].cover;
         if (badgeEl && coverCache[key].genre && book.genre === 'Fiction') {
@@ -363,7 +407,6 @@
         return;
       }
 
-      // 4. Google Books API with clean sanitization
       try {
         const cleanQuery = `${book.title} ${book.author}`.replace(/[^\w\s]/gi, ' ');
         const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
@@ -388,7 +431,6 @@
         }
       } catch (err) {}
 
-      // 5. Open Library Search
       try {
         const cleanTitle = book.title.replace(/[^\w\s]/gi, ' ').trim();
         const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(cleanTitle)}&limit=1`);
@@ -404,7 +446,6 @@
         }
       } catch (e) {}
 
-      // 6. Inline SVG fallback
       const fallbackSvg = createInlineSvgCover(book.title, book.author);
       if (imgEl) imgEl.src = fallbackSvg;
     }
@@ -441,34 +482,63 @@
         return;
       }
 
-      container.innerHTML = filtered.map((b, idx) => `
-        <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-4 flex gap-4 hover:border-burnBlue transition shadow-lg">
-          <img id="archive-img-${idx}" 
-               onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
-               src="${createInlineSvgCover(b.title, b.author)}" 
-               class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
-          <div class="flex flex-col justify-between flex-1 min-w-0">
-            <div>
-              <span id="genre-badge-${idx}" class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1 truncate max-w-full">
-                ${b.genre}
-              </span>
-              <h4 class="text-sm font-bold text-white truncate" title="${b.title}">${b.title}</h4>
-              <p class="text-xs text-cyan-200 truncate">${b.author}</p>
-            </div>
-            
-            <div class="flex items-center justify-between text-xs text-slate-400 mt-2 border-t border-[#002b82]/50 pt-2">
-              <span class="text-candlelight font-bold">★ ${b.rating}</span>
-              ${b.dateRead ? `
-                <span class="text-[11px] text-cyan-200/90 font-medium flex items-center gap-1 bg-[#001744] px-1.5 py-0.5 rounded">
-                  🗓️ ${b.dateRead}
+      container.innerHTML = filtered.map((b, idx) => {
+        const ratingInfo = getBookRatingData(b.title);
+        const safeTitle = b.title.replace(/'/g, "\\'");
+
+        // Generate the 5 star buttons
+        const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
+          const isFilled = starNum <= (ratingInfo.userVote || Math.round(parseFloat(ratingInfo.avg)));
+          const isUserVoted = starNum <= ratingInfo.userVote;
+          return `
+            <button onclick="voteBookRating('${safeTitle}', ${starNum})" 
+                    title="Rate ${starNum} stars" 
+                    class="star-btn text-base ${isUserVoted ? 'text-candlelight font-bold' : (isFilled ? 'text-candlelight/70' : 'text-slate-600')}">
+              ★
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-4 flex gap-4 hover:border-burnBlue transition shadow-lg">
+            <img id="archive-img-${idx}" 
+                 onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${b.author.replace(/'/g, "\\'")}')"
+                 src="${createInlineSvgCover(b.title, b.author)}" 
+                 class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
+            <div class="flex flex-col justify-between flex-1 min-w-0">
+              <div>
+                <span id="genre-badge-${idx}" class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1 truncate max-w-full">
+                  ${b.genre}
                 </span>
-              ` : `
-                <span class="text-[11px] text-cyan-300/60 font-medium">Read</span>
-              `}
+                <h4 class="text-sm font-bold text-white truncate" title="${b.title}">${b.title}</h4>
+                <p class="text-xs text-cyan-200 truncate">${b.author}</p>
+              </div>
+              
+              <!-- Interactive Community Rating & Date -->
+              <div class="mt-2 border-t border-[#002b82]/50 pt-2">
+                <div class="flex items-center justify-between gap-1 mb-1">
+                  <div class="flex items-center gap-0.5">
+                    ${starsHtml}
+                  </div>
+                  <span class="text-xs font-bold text-candlelight whitespace-nowrap">
+                    ${ratingInfo.avg} <span class="text-[10px] text-cyan-200/60 font-normal">(${ratingInfo.count})</span>
+                  </span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-slate-400">
+                  <span class="text-[10px] text-cyan-300/60">
+                    ${ratingInfo.userVote ? `You voted: ${ratingInfo.userVote}★` : 'Tap star to rate'}
+                  </span>
+                  ${b.dateRead ? `
+                    <span class="text-cyan-200/90 font-medium flex items-center gap-1 bg-[#001744] px-1.5 py-0.5 rounded">
+                      🗓️ ${b.dateRead}
+                    </span>
+                  ` : ''}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       filtered.forEach((b, idx) => {
         fetchBookCoverAndGenre(b, idx);
@@ -668,7 +738,6 @@
         ctx.restore();
       }
 
-      // Center ring
       ctx.beginPath();
       ctx.arc(160, 160, 25, 0, 2 * Math.PI);
       ctx.fillStyle = "#002063";
@@ -726,8 +795,7 @@
         author: currentWinner.author,
         dateRead: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         customCover: currentWinner.customCover || '',
-        genre: currentWinner.genre || 'Club Pick',
-        rating: 4.5
+        genre: currentWinner.genre || 'Club Pick'
       });
       deleteRecommendation(currentWinner.id);
       document.getElementById('winnerCard').classList.add('hidden');
