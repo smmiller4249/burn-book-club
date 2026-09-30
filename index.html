@@ -82,9 +82,7 @@
       </div>
 
       <!-- Current Book Spotlight Container -->
-      <div id="currentBookSpotlight" class="mb-8">
-        <!-- Rendered dynamically -->
-      </div>
+      <div id="currentBookSpotlight" class="mb-8"></div>
 
       <!-- Section Title for Previous Archive -->
       <div id="archiveHeading" class="mb-4 flex items-center justify-between border-b border-[#002b82] pb-2 hidden">
@@ -141,12 +139,13 @@
           <!-- Nominee Voting List -->
           <div>
             <div class="flex justify-between items-center mb-3">
-              <h3 class="text-lg font-bold text-white">Live Nominees & Votes</h3>
+              <div>
+                <h3 class="text-lg font-bold text-white">Live Nominees & Votes</h3>
+                <p class="text-[11px] text-cyan-300/70">Click any card to read its plot synopsis</p>
+              </div>
               <span class="text-xs text-cyan-200" id="recCount">0 books</span>
             </div>
-            <div id="recList" class="space-y-3">
-              <!-- Rendered dynamically -->
-            </div>
+            <div id="recList" class="space-y-3"></div>
           </div>
         </div>
 
@@ -161,7 +160,6 @@
               <button onclick="loadWheelMode('top3')" id="btn-mode-top3" class="px-3 py-1 rounded-md text-xs font-semibold bg-[#001744] text-slate-300 hover:text-white border border-[#003399]">Top 3 Most Voted</button>
             </div>
 
-            <!-- Canvas Container -->
             <div class="relative flex items-center justify-center my-2">
               <div class="absolute -top-3 z-10 wheel-pointer"></div>
               <canvas id="wheelCanvas" width="320" height="320" class="rounded-full shadow-2xl border-4 border-midnight bg-[#001744]"></canvas>
@@ -171,17 +169,16 @@
               🎡 Spin to Choose!
             </button>
 
-            <!-- Winner announcement card with Dropdowns for Month and Year -->
+            <!-- Winner announcement card -->
             <div id="winnerCard" class="hidden mt-4 w-full bg-[#001a52] border-2 border-candlelight p-5 rounded-xl text-center shadow-2xl">
               <span class="text-xs uppercase font-extrabold tracking-wider text-candlelight">Next Book Club Pick</span>
               <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1 break-words">Book Title</h4>
               <p id="winnerAuthor" class="text-xs text-cyan-200 mb-3">Author</p>
 
-              <!-- Month & Year Dropdown Selectors -->
-              <div class="bg-[#00133b] border border-[#002b82] rounded-lg p-3 my-3 text-left">
-                <label class="block text-xs font-bold text-candlelight mb-1.5">Meeting Month & Year:</label>
+              <div class="bg-[#00133b] border border-[#002b82] rounded-lg p-3.5 my-3 text-left">
+                <label class="block text-xs font-bold text-candlelight mb-2">Set Meeting Month:</label>
                 <div class="grid grid-cols-2 gap-2">
-                  <select id="winnerMeetingMonth" class="bg-[#001f5c] border border-[#003399] rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-burnBlue cursor-pointer">
+                  <select id="winnerMonthSelect" class="bg-[#001f5c] border border-[#003399] rounded px-3 py-2 text-xs text-white outline-none focus:border-burnBlue">
                     <option value="January">January</option>
                     <option value="February">February</option>
                     <option value="March">March</option>
@@ -195,14 +192,19 @@
                     <option value="November">November</option>
                     <option value="December">December</option>
                   </select>
-
-                  <select id="winnerMeetingYear" class="bg-[#001f5c] border border-[#003399] rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-burnBlue cursor-pointer">
-                    <!-- Populated dynamically via JS -->
+                  <select id="winnerYearSelect" class="bg-[#001f5c] border border-[#003399] rounded px-3 py-2 text-xs text-white outline-none focus:border-burnBlue">
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                    <option value="2028">2028</option>
+                    <option value="2029">2029</option>
+                    <option value="2030">2030</option>
                   </select>
                 </div>
               </div>
               
-              <button id="chooseBtn" onclick="markAsReadFromWinner()" class="w-full bg-gradient-to-r from-candlelight to-amber-400 hover:from-yellow-300 hover:to-candlelight text-midnight font-extrabold py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
+              <button id="chooseBtn" onclick="markAsReadFromWinner()" class="w-full bg-gradient-to-r from-candlelight to-amber-400 hover:from-yellow-300 hover:to-candlelight text-midnight font-extrabold py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center gap-2 mt-2">
                 <span>✅ Choose This Book & Save to Sheet</span>
               </button>
             </div>
@@ -214,13 +216,55 @@
 
   </main>
 
+  <!-- SYNOPSIS MODAL POPUP -->
+  <div id="synopsisModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[#001a52] border-2 border-burnBlue rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-[#002b82] flex justify-between items-start gap-3 bg-midnight">
+        <div class="flex gap-3 min-w-0">
+          <img id="modalCover" src="" class="w-14 h-20 object-cover rounded shadow bg-[#001744] flex-shrink-0" alt="Cover" />
+          <div class="min-w-0">
+            <span id="modalGenre" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1"></span>
+            <h3 id="modalTitle" class="text-base font-extrabold text-white leading-snug break-words"></h3>
+            <p id="modalAuthor" class="text-xs text-burnBlue mt-0.5"></p>
+            <p id="modalSuggestedBy" class="text-[10px] text-slate-400 mt-0.5"></p>
+          </div>
+        </div>
+        <button onclick="closeSynopsisModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#002b82] transition">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body: Synopsis Content -->
+      <div class="p-6 overflow-y-auto space-y-3 text-slate-200 text-sm leading-relaxed">
+        <div class="flex items-center justify-between text-xs font-semibold text-candlelight border-b border-[#002b82]/60 pb-2">
+          <span>📖 Book Overview & Synopsis</span>
+          <span id="modalPages" class="text-cyan-300/80 font-normal"></span>
+        </div>
+        <div id="modalSynopsisText" class="text-xs md:text-sm text-slate-300 whitespace-pre-line">
+          Loading synopsis...
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-[#002b82] bg-midnight flex justify-end">
+        <button onclick="closeSynopsisModal()" class="px-5 py-2 rounded-lg bg-burnBlue text-midnight font-bold text-xs hover:bg-cyan-400 transition">
+          Close Overview
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <script>
     // -------------------------------------------------------------
     // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
     // -------------------------------------------------------------
     const SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbwoyKzLW-QWXpHg5bhoTcupQ6vxpKxwx0PmIgU2p7ISJHWyRiI5JQaAcwNtyRfvIR4/exec";
 
-    // Direct ISBN covers for instant rendering without rate limits
     const directIsbnCovers = {
       "first lie wins": "https://covers.openlibrary.org/b/isbn/9780593492918-M.jpg",
       "before we were innocent": "https://covers.openlibrary.org/b/isbn/9780593418574-M.jpg",
@@ -261,6 +305,7 @@
     let pastReads = [];
     let recommendations = [];
     let ratingsDb = JSON.parse(localStorage.getItem('bbc_star_ratings') || '{}');
+    let synopsisCache = JSON.parse(localStorage.getItem('bbc_synopsis_cache') || '{}');
 
     let wheelMode = 'all';
     let currentWheelItems = [];
@@ -323,20 +368,6 @@
         return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
       }
       return trimmed;
-    }
-
-    // Populate Year Dropdown (Current year through next 4 years)
-    function initYearOptions() {
-      const yearSelect = document.getElementById('winnerMeetingYear');
-      if (!yearSelect) return;
-      const currentYear = new Date().getFullYear();
-      yearSelect.innerHTML = '';
-      for (let y = currentYear; y <= currentYear + 4; y++) {
-        const opt = document.createElement('option');
-        opt.value = String(y);
-        opt.textContent = String(y);
-        yearSelect.appendChild(opt);
-      }
     }
 
     async function fetchAppData() {
@@ -432,7 +463,6 @@
       `;
     }
 
-    // Render Archive: NEWEST TO OLDEST with Featured Current Book
     async function renderArchive(filter = "") {
       const spotlightContainer = document.getElementById('currentBookSpotlight');
       const gridContainer = document.getElementById('archiveGrid');
@@ -452,7 +482,6 @@
         return;
       }
 
-      // Reverse order so newest is at the top
       const orderedReads = [...filtered].reverse();
 
       if (!filter) {
@@ -509,6 +538,7 @@
 
         archiveHeading.classList.remove('hidden');
         archiveCount.textContent = `${orderedReads.length - 1} books`;
+
         renderGrid(orderedReads.slice(1), gridContainer);
       } else {
         spotlightContainer.innerHTML = '';
@@ -524,7 +554,7 @@
         return;
       }
 
-      container.innerHTML = books.map((b, idx) => {
+      container.innerHTML = books.map((b) => {
         const ratingInfo = getBookRatingData(b.title);
         const safeTitle = b.title.replace(/'/g, "\\'");
         const norm = normalizeTitle(b.title);
@@ -571,6 +601,7 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
+    // CLICKABLE NOMINEES: Opens Synopsis Modal on card click
     async function renderRecommendations() {
       const container = document.getElementById('recList');
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
@@ -586,22 +617,28 @@
         const norm = normalizeTitle(b.title);
         const coverSrc = b.customCover || directIsbnCovers[norm] || createInlineSvgCover(b.title, b.author);
         return `
-          <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition">
+          <div onclick="openSynopsisModal('${b.id}')" 
+               class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue hover:bg-[#002875] transition cursor-pointer group">
+            
             <div class="flex items-center gap-3 min-w-0 flex-1">
               <img onerror="this.onerror=null; this.src=createInlineSvgCover('${b.title.replace(/'/g, "\\'")}', '${b.author.replace(/'/g, "\\'")}')"
-                   class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
+                   class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0 group-hover:scale-105 transition" 
                    src="${coverSrc}" />
               <div class="min-w-0 flex-1">
                 <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-0.5">
                   ${b.genre || 'General Fiction'}
                 </span>
-                <h4 class="text-sm font-bold text-white leading-snug break-words">${b.title}</h4>
+                <h4 class="text-sm font-bold text-white leading-snug break-words group-hover:text-burnBlue transition">${b.title}</h4>
                 <p class="text-xs text-cyan-200 truncate">${b.author}</p>
-                ${b.suggestedBy ? `<p class="text-[10px] text-slate-400">By: ${b.suggestedBy}</p>` : ''}
+                <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                  ${b.suggestedBy ? `<span>By: ${b.suggestedBy}</span> • ` : ''}
+                  <span class="text-burnBlue font-semibold group-hover:underline">View synopsis ↗</span>
+                </div>
               </div>
             </div>
 
-            <div class="flex items-center gap-2 flex-shrink-0">
+            <!-- Action buttons: event.stopPropagation() prevents opening modal when voting/deleting -->
+            <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
               <button onclick="upvoteRecommendation('${b.id}')" title="Vote" class="flex items-center gap-1.5 bg-[#001744] hover:bg-midnight active:scale-95 text-candlelight px-3 py-1.5 rounded-lg border border-[#003399] transition">
                 <span class="text-xs font-semibold">▲</span>
                 <span class="text-sm font-bold">${b.votes}</span>
@@ -616,6 +653,88 @@
         `;
       }).join('');
     }
+
+    // AUTO-FETCH & DISPLAY SYNOPSIS MODAL
+    async function openSynopsisModal(nomineeId) {
+      const book = recommendations.find(r => String(r.id) === String(nomineeId));
+      if (!book) return;
+
+      const norm = normalizeTitle(book.title);
+      const coverSrc = book.customCover || directIsbnCovers[norm] || createInlineSvgCover(book.title, book.author);
+
+      document.getElementById('modalTitle').textContent = book.title;
+      document.getElementById('modalAuthor').textContent = `by ${book.author}`;
+      document.getElementById('modalGenre').textContent = book.genre || 'General Fiction';
+      document.getElementById('modalSuggestedBy').textContent = book.suggestedBy ? `Suggested by ${book.suggestedBy}` : '';
+      document.getElementById('modalCover').src = coverSrc;
+      document.getElementById('modalPages').textContent = '';
+      document.getElementById('modalSynopsisText').innerHTML = `
+        <div class="flex items-center gap-2 py-6 text-cyan-300">
+          <span class="w-2 h-2 rounded-full bg-burnBlue animate-ping"></span>
+          <span>Fetching synopsis...</span>
+        </div>
+      `;
+
+      document.getElementById('synopsisModal').classList.remove('hidden');
+
+      const cacheKey = `${book.title}-${book.author}`.toLowerCase();
+      if (synopsisCache[cacheKey]) {
+        document.getElementById('modalSynopsisText').textContent = synopsisCache[cacheKey].description;
+        if (synopsisCache[cacheKey].pageCount) {
+          document.getElementById('modalPages').textContent = `${synopsisCache[cacheKey].pageCount} pages`;
+        }
+        return;
+      }
+
+      // Fetch from Google Books API
+      try {
+        const cleanQuery = `intitle:"${book.title}" inauthor:"${book.author}"`;
+        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=1`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.items && data.items.length > 0) {
+            const info = data.items[0].volumeInfo;
+            let description = info.description || "";
+            // Clean up any stray HTML formatting tags from Google Books descriptions
+            description = description.replace(/<\/?[^>]+(>|$)/g, "");
+
+            if (description) {
+              synopsisCache[cacheKey] = {
+                description: description,
+                pageCount: info.pageCount || null
+              };
+              localStorage.setItem('bbc_synopsis_cache', JSON.stringify(synopsisCache));
+              document.getElementById('modalSynopsisText').textContent = description;
+              if (info.pageCount) {
+                document.getElementById('modalPages').textContent = `${info.pageCount} pages`;
+              }
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch synopsis from Google Books:", err);
+      }
+
+      // Fallback: If no synopsis is indexed online
+      document.getElementById('modalSynopsisText').innerHTML = `
+        <p class="italic text-slate-400">
+          No publisher synopsis was found online for this edition, but it was recommended as a <strong class="text-candlelight">${book.genre || 'great read'}</strong>!
+        </p>
+      `;
+    }
+
+    function closeSynopsisModal() {
+      document.getElementById('synopsisModal').classList.add('hidden');
+    }
+
+    // Close modal if user clicks outside of modal container
+    window.addEventListener('click', (e) => {
+      const modal = document.getElementById('synopsisModal');
+      if (e.target === modal) {
+        closeSynopsisModal();
+      }
+    });
 
     async function handleNewRecommendation(e) {
       e.preventDefault();
@@ -765,103 +884,106 @@
         stopRotateWheel();
         return;
       }
-      const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);Here is the updated `index.html` file. 
+      const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
+      startAngle += (spinAngle * Math.PI / 180);
+      drawWheel();
+      spinTimeout = setTimeout(rotateWheel, 30);
+    }
 
-### What Changed:
-* **Two Clean Dropdowns:** Replaced the text input with two streamlined selection dropdowns for **Month** and **Year**, with the upcoming month pre-selected automatically.
-* **Text Cleaned Up:** Removed all technical mentions of `"Column C"` and the helper note underneath.
+    function spinWheel() {
+      if (currentWheelItems.length === 0) return;
+      document.getElementById('spinBtn').disabled = true;
+      document.getElementById('winnerCard').classList.add('hidden');
+      spinAngleStart = Math.random() * 10 + 15;
+      spinTime = 0;
+      spinTimeTotal = Math.random() * 2000 + 3500;
+      rotateWheel();
+    }
 
----
+    function populateDefaultDateDropdowns() {
+      const now = new Date();
+      now.setMonth(now.getMonth() + 1);
+      const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      
+      const monthSelect = document.getElementById('winnerMonthSelect');
+      const yearSelect = document.getElementById('winnerYearSelect');
 
-### `index.html`
+      if (monthSelect) monthSelect.value = months[now.getMonth()];
+      if (yearSelect) yearSelect.value = String(now.getFullYear());
+    }
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="referrer" content="no-referrer" />
-  <title>Burn Gym Book Club Hub</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-  <link rel="preconnect" href="[https://fonts.googleapis.com](https://fonts.googleapis.com)">
-  <link rel="preconnect" href="[https://fonts.gstatic.com](https://fonts.gstatic.com)">
-  <link href="[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap)" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            burnBlue: '#00B1E1',
-            candlelight: '#FDDA13',
-            midnight: '#002063',
-          }
-        }
+    function stopRotateWheel() {
+      clearTimeout(spinTimeout);
+      const degrees = startAngle * 180 / Math.PI + 90;
+      const arDegrees = arc * 180 / Math.PI;
+      const index = Math.floor((360 - degrees % 360) / arDegrees);
+      currentWinner = currentWheelItems[index >= currentWheelItems.length ? 0 : index];
+      
+      document.getElementById('winnerText').textContent = currentWinner.title;
+      document.getElementById('winnerAuthor').textContent = `By ${currentWinner.author}`;
+      
+      populateDefaultDateDropdowns();
+
+      document.getElementById('winnerCard').classList.remove('hidden');
+      document.getElementById('spinBtn').disabled = false;
+    }
+
+    function easeOut(t, b, c, d) {
+      const ts = (t /= d) * t;
+      const tc = ts * t;
+      return b + c * (tc + -3 * ts + 3 * t);
+    }
+
+    async function markAsReadFromWinner() {
+      if (!currentWinner) return;
+
+      const chooseBtn = document.getElementById('chooseBtn');
+      chooseBtn.disabled = true;
+      chooseBtn.innerHTML = '<span>⏳ Saving to Google Sheet...</span>';
+
+      const selMonth = document.getElementById('winnerMonthSelect').value;
+      const selYear = document.getElementById('winnerYearSelect').value;
+      const chosenMeetingMonth = `${selMonth} ${selYear}`;
+
+      pastReads.push({
+        title: currentWinner.title,
+        author: currentWinner.author,
+        meetingMonth: chosenMeetingMonth,
+        cover: currentWinner.customCover || ''
+      });
+
+      recommendations = recommendations.filter(r => String(r.id) !== String(currentWinner.id));
+
+      try {
+        await fetch(SCRIPT_API_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "chooseWinner",
+            title: currentWinner.title,
+            author: currentWinner.author,
+            meetingMonth: chosenMeetingMonth,
+            customCover: currentWinner.customCover || '',
+            id: String(currentWinner.id)
+          })
+        });
+      } catch (err) {
+        console.warn("Could not post to sheet:", err);
       }
+
+      document.getElementById('winnerCard').classList.add('hidden');
+      chooseBtn.disabled = false;
+      chooseBtn.innerHTML = '<span>✅ Choose This Book & Save to Sheet</span>';
+      
+      renderArchive();
+      renderRecommendations();
+      updateWheelItems();
+      switchTab('archive');
     }
+
+    fetchAppData();
+    setInterval(fetchAppData, 30000);
   </script>
-  <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; }
-    .wheel-pointer {
-      width: 0;
-      height: 0;
-      border-left: 14px solid transparent;
-      border-right: 14px solid transparent;
-      border-top: 24px solid #FDDA13;
-    }
-    .star-btn {
-      transition: transform 0.15s ease, color 0.15s ease;
-    }
-    .star-btn:hover {
-      transform: scale(1.2);
-    }
-  </style>
-</head>
-<body class="bg-[#00133b] text-slate-100 min-h-screen pb-20">
-
-  <!-- Header -->
-  <header class="border-b border-[#002b82] bg-midnight/80 backdrop-blur sticky top-0 z-40">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
-      <div class="flex items-center gap-3">
-        <span class="text-3xl">🔥📖</span>
-        <div>
-          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            Burn Gym Book Club
-          </h1>
-          <p class="text-xs text-cyan-200">Sweat first, discuss plot twists second</p>
-        </div>
-      </div>
-      <nav class="flex gap-2">
-        <button onclick="switchTab('archive')" id="tab-archive" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-burnBlue text-midnight">Past Reads</button>
-        <button onclick="switchTab('recommendations')" id="tab-recommendations" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-midnight border border-[#002b82] text-slate-300 hover:text-white">Recommendations & Wheel</button>
-      </nav>
-    </div>
-  </header>
-
-  <main class="max-w-6xl mx-auto px-4 pt-8">
-
-    <!-- TAB 1: READ BOOKS ARCHIVE -->
-    <section id="section-archive">
-      <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-2xl font-bold text-white">Books We've Read</h2>
-            <span id="syncBadge" class="text-[11px] bg-cyan-950 text-burnBlue border border-burnBlue/40 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-burnBlue animate-pulse"></span>
-              Live Sheet Connected
-            </span>
-          </div>
-          <p class="text-sm text-cyan-100/70">Ordered newest to oldest. Tap any star to rate!</p>
-        </div>
-        <div class="relative">
-          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, genre, or month..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
-        </div>
-      </div>
-
-      <!-- Current Book Spotlight Container -->
-      <div id="currentBookSpotlight" class="mb-8"></div>
-
-      <!-- Section Title for Previous Archive -->
-      <div id="archiveHeading" class="mb-4 flex items-center justify-between border-b border-[#002b82] pb-2 hidden">
-        <h3 class="text-sm uppercase tracking-wider font-ext
+</body>
+</html>
