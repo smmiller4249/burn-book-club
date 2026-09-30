@@ -291,7 +291,7 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
-    // Render Recommendations
+ // Render Recommendations
     async function renderRecommendations() {
       const container = document.getElementById('recList');
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
@@ -307,7 +307,7 @@
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
             <img id="rec-img-${b.id}" class="w-12 h-16 object-cover rounded shadow bg-slate-800 flex-shrink-0" 
-                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Crect width='100%25' height='100%25' fill='%231e293b'/%3E%3C/svg%3E" />
+                 src="data:image/svg+xml,%3Csvg xmlns='[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)' width='48' height='64'%3E%3Crect width='100%25' height='100%25' fill='%231e293b'/%3E%3C/svg%3E" />
             <div class="min-w-0">
               <h4 class="text-sm font-bold text-white truncate">${b.title}</h4>
               <p class="text-xs text-slate-400 truncate">${b.author}</p>
@@ -317,10 +317,19 @@
               </div>
             </div>
           </div>
-          <button onclick="upvoteRecommendation(${b.id})" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
-            <span class="text-xs font-semibold">▲</span>
-            <span class="text-sm font-bold">${b.votes}</span>
-          </button>
+
+          <!-- Action buttons: Upvote & Delete -->
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button onclick="upvoteRecommendation(${b.id})" title="Vote" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+              <span class="text-xs font-semibold">▲</span>
+              <span class="text-sm font-bold">${b.votes}</span>
+            </button>
+            <button onclick="deleteRecommendation(${b.id})" title="Remove nominee" class="text-slate-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded-lg transition active:scale-90">
+              <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
         </div>
       `).join('');
 
