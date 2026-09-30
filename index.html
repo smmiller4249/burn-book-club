@@ -171,27 +171,40 @@
               🎡 Spin to Choose!
             </button>
 
-            <!-- Winner announcement card with Month Selector & Google Sheet writeback -->
+            <!-- Winner announcement card with Dropdowns for Month and Year -->
             <div id="winnerCard" class="hidden mt-4 w-full bg-[#001a52] border-2 border-candlelight p-5 rounded-xl text-center shadow-2xl">
               <span class="text-xs uppercase font-extrabold tracking-wider text-candlelight">Next Book Club Pick</span>
               <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1 break-words">Book Title</h4>
               <p id="winnerAuthor" class="text-xs text-cyan-200 mb-3">Author</p>
 
-              <!-- Meeting Month Selector -->
+              <!-- Month & Year Dropdown Selectors -->
               <div class="bg-[#00133b] border border-[#002b82] rounded-lg p-3 my-3 text-left">
-                <label class="block text-xs font-bold text-candlelight mb-1">Set Meeting Month (Column C):</label>
-                <div class="flex gap-2">
-                  <input type="text" id="winnerMeetingMonth" placeholder="e.g. November 2026" class="flex-1 bg-[#001f5c] border border-[#003399] rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-burnBlue" />
-                  <button type="button" onclick="setNextMonthSuggestion()" class="bg-[#002b82] hover:bg-burnBlue hover:text-midnight text-cyan-200 text-[10px] font-bold px-2 py-1.5 rounded transition">
-                    +1 Month
-                  </button>
+                <label class="block text-xs font-bold text-candlelight mb-1.5">Meeting Month & Year:</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <select id="winnerMeetingMonth" class="bg-[#001f5c] border border-[#003399] rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-burnBlue cursor-pointer">
+                    <option value="January">January</option>
+                    <option value="February">February</option>
+                    <option value="March">March</option>
+                    <option value="April">April</option>
+                    <option value="May">May</option>
+                    <option value="June">June</option>
+                    <option value="July">July</option>
+                    <option value="August">August</option>
+                    <option value="September">September</option>
+                    <option value="October">October</option>
+                    <option value="November">November</option>
+                    <option value="December">December</option>
+                  </select>
+
+                  <select id="winnerMeetingYear" class="bg-[#001f5c] border border-[#003399] rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-burnBlue cursor-pointer">
+                    <!-- Populated dynamically via JS -->
+                  </select>
                 </div>
               </div>
               
               <button id="chooseBtn" onclick="markAsReadFromWinner()" class="w-full bg-gradient-to-r from-candlelight to-amber-400 hover:from-yellow-300 hover:to-candlelight text-midnight font-extrabold py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
                 <span>✅ Choose This Book & Save to Sheet</span>
               </button>
-              <p class="text-[10px] text-cyan-300/70 mt-2">Appends row with the selected month to Column C</p>
             </div>
           </div>
         </div>
@@ -312,6 +325,20 @@
       return trimmed;
     }
 
+    // Populate Year Dropdown (Current year through next 4 years)
+    function initYearOptions() {
+      const yearSelect = document.getElementById('winnerMeetingYear');
+      if (!yearSelect) return;
+      const currentYear = new Date().getFullYear();
+      yearSelect.innerHTML = '';
+      for (let y = currentYear; y <= currentYear + 4; y++) {
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(y);
+        yearSelect.appendChild(opt);
+      }
+    }
+
     async function fetchAppData() {
       try {
         const res = await fetch(SCRIPT_API_URL);
@@ -382,7 +409,6 @@
       }
     }
 
-    // Helper to generate star buttons HTML
     function buildStarRatingHtml(safeTitle, ratingInfo) {
       const starsHtml = [1, 2, 3, 4, 5].map(starNum => {
         const isFilled = starNum <= (ratingInfo.userVote || Math.round(parseFloat(ratingInfo.avg)));
@@ -413,7 +439,6 @@
       const archiveHeading = document.getElementById('archiveHeading');
       const archiveCount = document.getElementById('archiveCount');
 
-      // Filter
       const filtered = pastReads.filter(b => 
         b.title.toLowerCase().includes(filter.toLowerCase()) || 
         b.author.toLowerCase().includes(filter.toLowerCase()) ||
@@ -427,10 +452,9 @@
         return;
       }
 
-      // REVERSE ORDER: The newest additions (last rows in Sheet) become Index 0
+      // Reverse order so newest is at the top
       const orderedReads = [...filtered].reverse();
 
-      // CURRENT BOOK SPOTLIGHT (Index 0 when not filtering)
       if (!filter) {
         const currentBook = orderedReads[0];
         const safeTitle = currentBook.title.replace(/'/g, "\\'");
@@ -444,12 +468,10 @@
           <div class="rounded-2xl p-6 bg-gradient-to-r from-[#002063] via-[#002c87] to-[#001744] border-2 border-candlelight shadow-2xl shadow-candlelight/20 relative overflow-hidden flex flex-col md:flex-row items-center md:items-stretch gap-6">
             <div class="absolute -right-8 -bottom-8 text-8xl opacity-10 select-none pointer-events-none">🔥</div>
             
-            <!-- Larger Cover for Current Book -->
             <img onerror="this.onerror=null; this.src=createInlineSvgCover('${safeTitle}', '${currentBook.author.replace(/'/g, "\\'")}')"
                  src="${coverImg}" 
                  class="w-32 h-48 md:w-36 md:h-52 object-cover rounded-xl shadow-2xl flex-shrink-0 bg-[#001744] border-2 border-candlelight/50" alt="${currentBook.title}" />
             
-            <!-- Book Details -->
             <div class="flex flex-col justify-between flex-1 text-center md:text-left min-w-0">
               <div>
                 <div class="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
@@ -473,7 +495,6 @@
                 </p>
               </div>
 
-              <!-- Star Rating Component for Current Book -->
               <div class="mt-4 pt-3 border-t border-[#003399]/60 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
                   ${buildStarRatingHtml(safeTitle, ratingInfo)}
@@ -488,11 +509,8 @@
 
         archiveHeading.classList.remove('hidden');
         archiveCount.textContent = `${orderedReads.length - 1} books`;
-
-        // The remaining books (Index 1 and beyond)
         renderGrid(orderedReads.slice(1), gridContainer);
       } else {
-        // When searching, display matching results in grid
         spotlightContainer.innerHTML = '';
         archiveHeading.classList.remove('hidden');
         archiveCount.textContent = `${orderedReads.length} matching`;
@@ -500,7 +518,6 @@
       }
     }
 
-    // Helper to render remaining books in grid (newest to oldest)
     function renderGrid(books, container) {
       if (books.length === 0) {
         container.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center col-span-full">No previous books to display.</p>`;
@@ -554,7 +571,6 @@
       renderArchive(document.getElementById('archiveSearch').value);
     }
 
-    // Live Nominees & Upvoting
     async function renderRecommendations() {
       const container = document.getElementById('recList');
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
@@ -749,104 +765,103 @@
         stopRotateWheel();
         return;
       }
-      const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
-      startAngle += (spinAngle * Math.PI / 180);
-      drawWheel();
-      spinTimeout = setTimeout(rotateWheel, 30);
-    }
+      const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);Here is the updated `index.html` file. 
 
-    function spinWheel() {
-      if (currentWheelItems.length === 0) return;
-      document.getElementById('spinBtn').disabled = true;
-      document.getElementById('winnerCard').classList.add('hidden');
-      spinAngleStart = Math.random() * 10 + 15;
-      spinTime = 0;
-      spinTimeTotal = Math.random() * 2000 + 3500;
-      rotateWheel();
-    }
+### What Changed:
+* **Two Clean Dropdowns:** Replaced the text input with two streamlined selection dropdowns for **Month** and **Year**, with the upcoming month pre-selected automatically.
+* **Text Cleaned Up:** Removed all technical mentions of `"Column C"` and the helper note underneath.
 
-    function setNextMonthSuggestion() {
-      const now = new Date();
-      // Suggest next month
-      now.setMonth(now.getMonth() + 1);
-      const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-      document.getElementById('winnerMeetingMonth').value = `${months[now.getMonth()]} ${now.getFullYear()}`;
-    }
+---
 
-    function stopRotateWheel() {
-      clearTimeout(spinTimeout);
-      const degrees = startAngle * 180 / Math.PI + 90;
-      const arDegrees = arc * 180 / Math.PI;
-      const index = Math.floor((360 - degrees % 360) / arDegrees);
-      currentWinner = currentWheelItems[index >= currentWheelItems.length ? 0 : index];
-      
-      document.getElementById('winnerText').textContent = currentWinner.title;
-      document.getElementById('winnerAuthor').textContent = `By ${currentWinner.author}`;
-      
-      // Pre-fill suggested meeting month
-      setNextMonthSuggestion();
+### `index.html`
 
-      document.getElementById('winnerCard').classList.remove('hidden');
-      document.getElementById('spinBtn').disabled = false;
-    }
-
-    function easeOut(t, b, c, d) {
-      const ts = (t /= d) * t;
-      const tc = ts * t;
-      return b + c * (tc + -3 * ts + 3 * t);
-    }
-
-    // Save chosen book to Sheet1 with User-Selected Meeting Month in Column C
-    async function markAsReadFromWinner() {
-      if (!currentWinner) return;
-
-      const chooseBtn = document.getElementById('chooseBtn');
-      chooseBtn.disabled = true;
-      chooseBtn.innerHTML = '<span>⏳ Saving to Google Sheet...</span>';
-
-      const customMonth = document.getElementById('winnerMeetingMonth').value.trim() || "Upcoming";
-
-      // Push to local pastReads (appended at end of sheet, so it becomes the latest/current book)
-      pastReads.push({
-        title: currentWinner.title,
-        author: currentWinner.author,
-        meetingMonth: customMonth,
-        cover: currentWinner.customCover || ''
-      });
-
-      recommendations = recommendations.filter(r => String(r.id) !== String(currentWinner.id));
-
-      try {
-        await fetch(SCRIPT_API_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "chooseWinner",
-            title: currentWinner.title,
-            author: currentWinner.author,
-            meetingMonth: customMonth,
-            customCover: currentWinner.customCover || '',
-            id: String(currentWinner.id)
-          })
-        });
-      } catch (err) {
-        console.warn("Could not post to sheet:", err);
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Burn Gym Book Club Hub</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+  <link rel="preconnect" href="[https://fonts.googleapis.com](https://fonts.googleapis.com)">
+  <link rel="preconnect" href="[https://fonts.gstatic.com](https://fonts.gstatic.com)">
+  <link href="[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap)" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            burnBlue: '#00B1E1',
+            candlelight: '#FDDA13',
+            midnight: '#002063',
+          }
+        }
       }
-
-      document.getElementById('winnerCard').classList.add('hidden');
-      chooseBtn.disabled = false;
-      chooseBtn.innerHTML = '<span>✅ Choose This Book & Save to Sheet</span>';
-      
-      renderArchive();
-      renderRecommendations();
-      updateWheelItems();
-      switchTab('archive');
     }
-
-    // Fetch shared live database on page load and poll every 30 seconds
-    fetchAppData();
-    setInterval(fetchAppData, 30000);
   </script>
-</body>
-</html>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .wheel-pointer {
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 24px solid #FDDA13;
+    }
+    .star-btn {
+      transition: transform 0.15s ease, color 0.15s ease;
+    }
+    .star-btn:hover {
+      transform: scale(1.2);
+    }
+  </style>
+</head>
+<body class="bg-[#00133b] text-slate-100 min-h-screen pb-20">
+
+  <!-- Header -->
+  <header class="border-b border-[#002b82] bg-midnight/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🔥📖</span>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            Burn Gym Book Club
+          </h1>
+          <p class="text-xs text-cyan-200">Sweat first, discuss plot twists second</p>
+        </div>
+      </div>
+      <nav class="flex gap-2">
+        <button onclick="switchTab('archive')" id="tab-archive" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-burnBlue text-midnight">Past Reads</button>
+        <button onclick="switchTab('recommendations')" id="tab-recommendations" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-midnight border border-[#002b82] text-slate-300 hover:text-white">Recommendations & Wheel</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 pt-8">
+
+    <!-- TAB 1: READ BOOKS ARCHIVE -->
+    <section id="section-archive">
+      <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-2xl font-bold text-white">Books We've Read</h2>
+            <span id="syncBadge" class="text-[11px] bg-cyan-950 text-burnBlue border border-burnBlue/40 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-burnBlue animate-pulse"></span>
+              Live Sheet Connected
+            </span>
+          </div>
+          <p class="text-sm text-cyan-100/70">Ordered newest to oldest. Tap any star to rate!</p>
+        </div>
+        <div class="relative">
+          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, genre, or month..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
+        </div>
+      </div>
+
+      <!-- Current Book Spotlight Container -->
+      <div id="currentBookSpotlight" class="mb-8"></div>
+
+      <!-- Section Title for Previous Archive -->
+      <div id="archiveHeading" class="mb-4 flex items-center justify-between border-b border-[#002b82] pb-2 hidden">
+        <h3 class="text-sm uppercase tracking-wider font-ext
