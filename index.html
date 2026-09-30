@@ -4,12 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="referrer" content="no-referrer" />
-  <title>Brun Gym Book Club Hub</title>
+  <title>Burn Gym Book Club Hub</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            burnBlue: '#00B1E1',
+            candlelight: '#FDDA13',
+            midnight: '#002063',
+          }
+        }
+      }
+    }
+  </script>
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     .wheel-pointer {
@@ -17,25 +30,27 @@
       height: 0;
       border-left: 14px solid transparent;
       border-right: 14px solid transparent;
-      border-top: 24px solid #ef4444;
+      border-top: 24px solid #FDDA13;
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen pb-20">
+<body class="bg-[#00133b] text-slate-100 min-h-screen pb-20">
 
   <!-- Header -->
-  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-40">
+  <header class="border-b border-[#002b82] bg-midnight/80 backdrop-blur sticky top-0 z-40">
     <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
       <div class="flex items-center gap-3">
-        <span class="text-3xl">🏋️📖</span>
+        <span class="text-3xl">🔥📖</span>
         <div>
-          <h1 class="text-xl font-bold tracking-tight text-white">Brun Gym Book Club</h1>
-          <p class="text-xs text-slate-400">Sweat first, discuss plot twists second</p>
+          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            Burn Gym Book Club
+          </h1>
+          <p class="text-xs text-cyan-200">Sweat first, discuss plot twists second</p>
         </div>
       </div>
       <nav class="flex gap-2">
-        <button onclick="switchTab('archive')" id="tab-archive" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-amber-500 text-slate-950">Past Reads</button>
-        <button onclick="switchTab('recommendations')" id="tab-recommendations" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-slate-800 text-slate-300 hover:text-white">Recommendations & Wheel</button>
+        <button onclick="switchTab('archive')" id="tab-archive" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-burnBlue text-midnight">Past Reads</button>
+        <button onclick="switchTab('recommendations')" id="tab-recommendations" class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-midnight border border-[#002b82] text-slate-300 hover:text-white">Recommendations & Wheel</button>
       </nav>
     </div>
   </header>
@@ -48,21 +63,21 @@
         <div>
           <div class="flex items-center gap-2">
             <h2 class="text-2xl font-bold text-white">Books We've Read</h2>
-            <span id="syncBadge" class="text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="syncBadge" class="text-[11px] bg-cyan-950 text-burnBlue border border-burnBlue/40 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-burnBlue animate-pulse"></span>
               Live Sheet Synced
             </span>
           </div>
-          <p class="text-sm text-slate-400">Archive automatically updated from your Google Sheet</p>
+          <p class="text-sm text-cyan-100/70">Archive automatically updated from your Google Sheet</p>
         </div>
         <div class="relative">
-          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title or author..." class="bg-slate-900 border border-slate-700 text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-amber-400 outline-none text-white placeholder-slate-500">
+          <input type="text" id="archiveSearch" oninput="filterArchive()" placeholder="Search title, author, or genre..." class="bg-midnight border border-[#003399] text-sm rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-burnBlue outline-none text-white placeholder-slate-400">
         </div>
       </div>
 
       <!-- Book Grid -->
       <div id="archiveGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div class="text-slate-400 text-sm py-8 col-span-full text-center">Loading books from Google Sheet...</div>
+        <div class="text-cyan-200 text-sm py-8 col-span-full text-center">Loading books from Google Sheet...</div>
       </div>
     </section>
 
@@ -72,35 +87,35 @@
         
         <!-- Left: Suggest Form & Voting List -->
         <div class="lg:col-span-7 space-y-6">
-          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+          <div class="bg-midnight/70 border border-[#002b82] rounded-2xl p-6 shadow-xl backdrop-blur">
             <h3 class="text-lg font-bold text-white mb-1">Suggest a Book</h3>
-            <p class="text-xs text-slate-400 mb-4">No login required. Drop title & author, or add a direct cover link if you have one!</p>
+            <p class="text-xs text-cyan-200 mb-4">No login required. Submit a title & author; cover art and genre tags populate automatically!</p>
             <form id="recForm" onsubmit="handleNewRecommendation(event)" class="space-y-3">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-xs font-semibold text-slate-300 mb-1">Book Title *</label>
-                  <input required id="recTitle" type="text" placeholder="e.g. Tomorrow, and Tomorrow..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-400 outline-none">
+                  <label class="block text-xs font-semibold text-cyan-100 mb-1">Book Title *</label>
+                  <input required id="recTitle" type="text" placeholder="e.g. Tomorrow, and Tomorrow..." class="w-full bg-[#001744] border border-[#003399] rounded-lg px-3 py-2 text-sm text-white focus:border-burnBlue outline-none">
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-slate-300 mb-1">Author *</label>
-                  <input required id="recAuthor" type="text" placeholder="e.g. Gabrielle Zevin" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-400 outline-none">
+                  <label class="block text-xs font-semibold text-cyan-100 mb-1">Author *</label>
+                  <input required id="recAuthor" type="text" placeholder="e.g. Gabrielle Zevin" class="w-full bg-[#001744] border border-[#003399] rounded-lg px-3 py-2 text-sm text-white focus:border-burnBlue outline-none">
                 </div>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-xs font-semibold text-slate-300 mb-1">Your Name (Optional)</label>
-                  <input id="recBy" type="text" placeholder="e.g. Sarah" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-400 outline-none">
+                  <label class="block text-xs font-semibold text-cyan-100 mb-1">Your Name (Optional)</label>
+                  <input id="recBy" type="text" placeholder="e.g. Coach Sarah" class="w-full bg-[#001744] border border-[#003399] rounded-lg px-3 py-2 text-sm text-white focus:border-burnBlue outline-none">
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-slate-300 mb-1">Genre / Pitch</label>
-                  <input id="recGenre" type="text" placeholder="e.g. Thriller, Cozy Mystery" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-400 outline-none">
+                  <label class="block text-xs font-semibold text-cyan-100 mb-1">Genre</label>
+                  <input id="recGenre" type="text" placeholder="e.g. Thriller, Mystery" class="w-full bg-[#001744] border border-[#003399] rounded-lg px-3 py-2 text-sm text-white focus:border-burnBlue outline-none">
                 </div>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Optional Custom Cover Image URL</label>
-                <input id="recCoverUrl" type="url" placeholder="https://... (or leave blank to auto-fetch)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-400 outline-none">
+                <label class="block text-xs font-semibold text-cyan-100 mb-1">Optional Custom Cover Image URL</label>
+                <input id="recCoverUrl" type="url" placeholder="https://... (or leave blank to auto-fetch)" class="w-full bg-[#001744] border border-[#003399] rounded-lg px-3 py-2 text-sm text-white focus:border-burnBlue outline-none">
               </div>
-              <button type="submit" id="submitBtn" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-2.5 rounded-lg text-sm transition mt-2">
+              <button type="submit" id="submitBtn" class="w-full bg-burnBlue hover:bg-cyan-400 text-midnight font-bold py-2.5 rounded-lg text-sm transition mt-2 shadow">
                 Add to Nominees
               </button>
             </form>
@@ -110,7 +125,7 @@
           <div>
             <div class="flex justify-between items-center mb-3">
               <h3 class="text-lg font-bold text-white">Nominees & Votes</h3>
-              <span class="text-xs text-slate-400" id="recCount">0 books</span>
+              <span class="text-xs text-cyan-200" id="recCount">0 books</span>
             </div>
             <div id="recList" class="space-y-3">
               <!-- Rendered dynamically -->
@@ -120,31 +135,31 @@
 
         <!-- Right: Wheel Decider -->
         <div class="lg:col-span-5">
-          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col items-center sticky top-24">
+          <div class="bg-midnight/70 border border-[#002b82] rounded-2xl p-6 flex flex-col items-center sticky top-24 shadow-xl">
             <h3 class="text-lg font-bold text-white mb-1">Selection Wheel</h3>
-            <p class="text-xs text-slate-400 text-center mb-4">Spin with all nominees, or narrow down to top upvoted books!</p>
+            <p class="text-xs text-cyan-200 text-center mb-4">Spin all nominees, or narrow down to the top-voted picks!</p>
             
             <div class="flex gap-2 mb-4">
-              <button onclick="loadWheelMode('all')" id="btn-mode-all" class="px-3 py-1 rounded-md text-xs font-medium bg-amber-500 text-slate-950">All Nominees</button>
-              <button onclick="loadWheelMode('top3')" id="btn-mode-top3" class="px-3 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300">Top 3 Most Voted</button>
+              <button onclick="loadWheelMode('all')" id="btn-mode-all" class="px-3 py-1 rounded-md text-xs font-bold bg-burnBlue text-midnight">All Nominees</button>
+              <button onclick="loadWheelMode('top3')" id="btn-mode-top3" class="px-3 py-1 rounded-md text-xs font-semibold bg-[#001744] text-slate-300 hover:text-white border border-[#003399]">Top 3 Most Voted</button>
             </div>
 
             <!-- Canvas Container -->
             <div class="relative flex items-center justify-center my-2">
               <div class="absolute -top-3 z-10 wheel-pointer"></div>
-              <canvas id="wheelCanvas" width="320" height="320" class="rounded-full shadow-2xl border-4 border-slate-800"></canvas>
+              <canvas id="wheelCanvas" width="320" height="320" class="rounded-full shadow-2xl border-4 border-midnight bg-[#001744]"></canvas>
             </div>
 
-            <button onclick="spinWheel()" id="spinBtn" class="mt-5 w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95">
+            <button onclick="spinWheel()" id="spinBtn" class="mt-5 w-full bg-gradient-to-r from-burnBlue via-cyan-400 to-candlelight hover:opacity-90 text-midnight font-extrabold py-3 rounded-xl shadow-lg transition transform active:scale-95">
               🎡 Spin to Choose!
             </button>
 
             <!-- Winner announcement card -->
-            <div id="winnerCard" class="hidden mt-4 w-full bg-amber-500/10 border border-amber-500/40 p-4 rounded-xl text-center">
-              <span class="text-xs uppercase font-bold tracking-wider text-amber-400">Next Book Club Pick</span>
+            <div id="winnerCard" class="hidden mt-4 w-full bg-[#001a52] border-2 border-candlelight p-4 rounded-xl text-center shadow-lg">
+              <span class="text-xs uppercase font-extrabold tracking-wider text-candlelight">Next Book Club Pick</span>
               <h4 id="winnerText" class="text-lg font-extrabold text-white mt-1">Book Title</h4>
-              <p id="winnerAuthor" class="text-xs text-slate-300 mb-2">Author</p>
-              <button onclick="markAsReadFromWinner()" class="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-md transition">Move to Past Reads</button>
+              <p id="winnerAuthor" class="text-xs text-cyan-200 mb-3">Author</p>
+              <button onclick="markAsReadFromWinner()" class="text-xs bg-burnBlue hover:bg-cyan-400 text-midnight font-bold px-4 py-2 rounded-md transition">Move to Past Reads</button>
             </div>
           </div>
         </div>
@@ -155,8 +170,25 @@
   </main>
 
   <script>
-    // Live Google Sheet CSV URL
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTglAzQPF6Bgza9BxOatXJqeNfgBw6uES2Lfb_DwBcM9-RWjSy8ICHpnaD-e7wbMQm9foZR84-pUbc8/pub?output=csv";
+
+    // Known genres for seed books (used if Google Sheet doesn't specify one)
+    const genreDirectory = {
+      "first lie wins": "Mystery / Thriller",
+      "before we were innocent": "Psychological Fiction",
+      "just for the summer": "Romance / Contemporary",
+      "mother-daughter murder night": "Whodunit / Mystery",
+      "twenty years later": "Crime Thriller",
+      "i hope this finds you well": "Workplace Humor",
+      "the only one left": "Gothic Thriller",
+      "husbands": "Speculative / Comedy",
+      "the drowning woman": "Psychological Suspense",
+      "the three lives of cate kay": "Fiction / Drama",
+      "the southern book club's guide to slaying vampires": "Horror / Dark Comedy",
+      "theo of golden": "Inspirational Fiction",
+      "anatomy of an alibi": "Legal Thriller",
+      "bad mother": "Romantic Suspense"
+    };
 
     let pastReads = [];
     let recommendations = JSON.parse(localStorage.getItem('bbc_recommendations')) || [
@@ -179,7 +211,6 @@
     // Cache cover URLs in local storage
     const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
 
-    // Convert Google Drive view URLs to raw thumbnail/display URLs
     function formatCoverUrl(url) {
       if (!url) return "";
       const trimmed = url.trim();
@@ -192,7 +223,6 @@
       return trimmed;
     }
 
-    // CSV line parser handling quotes and commas
     function parseCSVLine(line) {
       const result = [];
       let cur = '';
@@ -220,20 +250,35 @@
         const lines = csvText.trim().split(/\r?\n/);
         const parsed = [];
 
-        // Skip header row
+        // Check headers to support flexible columns
+        const headerCols = lines[0] ? parseCSVLine(lines[0]).map(h => h.toLowerCase()) : [];
+        const genreColIdx = headerCols.findIndex(h => h.includes('genre') || h.includes('category'));
+        const coverColIdx = headerCols.findIndex(h => h.includes('cover') || h.includes('image') || h.includes('link') || h.includes('url'));
+
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
           const cols = parseCSVLine(line);
-          if (cols[0]) {
-            parsed.push({
-              title: cols[0],
-              author: cols[1] || 'Unknown Author',
-              customCover: cols[2] ? formatCoverUrl(cols[2]) : '',
-              rating: (4.0 + (cols[0].length % 9) * 0.1).toFixed(1),
-              genre: 'Club Read'
-            });
+          const title = cols[0];
+          const author = cols[1] || 'Unknown Author';
+          if (!title) continue;
+
+          // Determine genre: 1. From Sheet Column, 2. From Directory, 3. General Fiction
+          let genre = (genreColIdx !== -1 && cols[genreColIdx]) ? cols[genreColIdx] : (genreDirectory[title.toLowerCase()] || "General Fiction");
+          
+          // Determine custom cover: From designated column, or column 3 if it looks like a URL
+          let customCover = (coverColIdx !== -1 && cols[coverColIdx]) ? formatCoverUrl(cols[coverColIdx]) : '';
+          if (!customCover && cols[2] && (cols[2].startsWith('http') || cols[2].includes('drive.google'))) {
+            customCover = formatCoverUrl(cols[2]);
           }
+
+          parsed.push({
+            title,
+            author,
+            genre,
+            customCover,
+            rating: (4.0 + (title.length % 9) * 0.1).toFixed(1)
+          });
         }
 
         if (parsed.length > 0) {
@@ -246,48 +291,70 @@
       renderArchive();
     }
 
-    async function fetchBookCover(title, author, customUrl = "") {
-      // 1. Direct custom cover (from Column C in Google Sheet or recommendation input)
-      if (customUrl) {
-        return formatCoverUrl(customUrl);
+    async function fetchBookCoverAndGenre(book, idx) {
+      const key = `${book.title}-${book.author}`.toLowerCase();
+      const badgeEl = document.getElementById(`genre-badge-${idx}`);
+      const imgEl = document.getElementById(`archive-img-${idx}`);
+
+      if (book.customCover) {
+        if (imgEl) imgEl.src = book.customCover;
+        return;
       }
 
-      const key = `${title}-${author}`.toLowerCase();
-      if (coverCache[key]) return coverCache[key];
+      if (coverCache[key]) {
+        if (imgEl) imgEl.src = coverCache[key].cover;
+        if (badgeEl && book.genre === 'General Fiction' && coverCache[key].genre) {
+          badgeEl.textContent = coverCache[key].genre;
+        }
+        return;
+      }
 
-      // 2. Open Library Search API
+      // 1. Try Open Library
       try {
-        const qTitle = encodeURIComponent(title.trim());
-        const qAuthor = encodeURIComponent(author.trim());
+        const qTitle = encodeURIComponent(book.title.trim());
+        const qAuthor = encodeURIComponent(book.author.trim());
         const olRes = await fetch(`https://openlibrary.org/search.json?title=${qTitle}&author=${qAuthor}&limit=1`);
         if (olRes.ok) {
           const olData = await olRes.json();
-          if (olData.docs && olData.docs.length > 0 && olData.docs[0].cover_i) {
-            const coverId = olData.docs[0].cover_i;
-            const imgUrl = `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
-            coverCache[key] = imgUrl;
-            localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
-            return imgUrl;
+          if (olData.docs && olData.docs.length > 0) {
+            const doc = olData.docs[0];
+            let imgUrl = doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '';
+            let apiGenre = (doc.subject && doc.subject.length > 0) ? doc.subject.slice(0, 2).join(' / ') : '';
+
+            if (imgUrl) {
+              coverCache[key] = { cover: imgUrl, genre: apiGenre };
+              localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
+              if (imgEl) imgEl.src = imgUrl;
+              if (badgeEl && book.genre === 'General Fiction' && apiGenre) {
+                badgeEl.textContent = apiGenre;
+              }
+              return;
+            }
           }
         }
       } catch (e) {
         console.warn("Open Library fetch error:", e);
       }
 
-      // 3. Fallback to Google Books API
+      // 2. Try Google Books API Fallback
       try {
-        const query = encodeURIComponent(`${title} ${author}`);
+        const query = encodeURIComponent(`${book.title} ${book.author}`);
         const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1`);
         if (gbRes.ok) {
           const data = await gbRes.json();
           if (data.items && data.items.length > 0) {
             const info = data.items[0].volumeInfo;
             let img = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || "";
+            let apiGenre = info.categories ? info.categories[0] : "";
             if (img) {
               img = img.replace("http://", "https://");
-              coverCache[key] = img;
+              coverCache[key] = { cover: img, genre: apiGenre };
               localStorage.setItem('bbc_cover_cache', JSON.stringify(coverCache));
-              return img;
+              if (imgEl) imgEl.src = img;
+              if (badgeEl && book.genre === 'General Fiction' && apiGenre) {
+                badgeEl.textContent = apiGenre;
+              }
+              return;
             }
           }
         }
@@ -295,7 +362,8 @@
         console.warn("Google Books fetch error:", err);
       }
 
-      return `https://placehold.co/180x260/1e293b/f8fafc?text=${encodeURIComponent(title)}`;
+      // Fallback placeholder card
+      if (imgEl) imgEl.src = `https://placehold.co/180x260/002063/00B1E1?text=${encodeURIComponent(book.title)}`;
     }
 
     function switchTab(tab) {
@@ -304,12 +372,12 @@
       document.getElementById('section-recommendations').classList.toggle('hidden', isArchive);
       
       document.getElementById('tab-archive').className = isArchive 
-        ? "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-amber-500 text-slate-950" 
-        : "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-slate-800 text-slate-300 hover:text-white";
+        ? "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-burnBlue text-midnight" 
+        : "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-midnight border border-[#002b82] text-slate-300 hover:text-white";
         
       document.getElementById('tab-recommendations').className = !isArchive 
-        ? "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-amber-500 text-slate-950" 
-        : "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-slate-800 text-slate-300 hover:text-white";
+        ? "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-burnBlue text-midnight" 
+        : "px-4 py-1.5 rounded-full text-sm font-semibold transition bg-midnight border border-[#002b82] text-slate-300 hover:text-white";
 
       if (!isArchive) {
         updateWheelItems();
@@ -320,38 +388,37 @@
       const container = document.getElementById('archiveGrid');
       const filtered = pastReads.filter(b => 
         b.title.toLowerCase().includes(filter.toLowerCase()) || 
-        b.author.toLowerCase().includes(filter.toLowerCase())
+        b.author.toLowerCase().includes(filter.toLowerCase()) ||
+        b.genre.toLowerCase().includes(filter.toLowerCase())
       );
 
       if (filtered.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500 py-6 text-center col-span-full">No books match your search.</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center col-span-full">No books match your search.</p>`;
         return;
       }
 
       container.innerHTML = filtered.map((b, idx) => `
-        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-4 flex gap-4 hover:border-slate-700 transition">
-          <img id="archive-img-${idx}" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='120'%3E%3Crect width='100%25' height='100%25' fill='%231e293b'/%3E%3C/svg%3E" 
-               class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-slate-800" alt="${b.title}" />
+        <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-4 flex gap-4 hover:border-burnBlue transition shadow-lg">
+          <img id="archive-img-${idx}" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='120'%3E%3Crect width='100%25' height='100%25' fill='%23001744'/%3E%3C/svg%3E" 
+               class="w-20 h-28 object-cover rounded shadow-md flex-shrink-0 bg-[#001744]" alt="${b.title}" />
           <div class="flex flex-col justify-between flex-1 min-w-0">
             <div>
-              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800 text-amber-400 inline-block mb-1">
-                ${b.genre || 'Club Read'}
+              <span id="genre-badge-${idx}" class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-1 truncate max-w-full">
+                ${b.genre}
               </span>
               <h4 class="text-sm font-bold text-white truncate" title="${b.title}">${b.title}</h4>
-              <p class="text-xs text-slate-400 truncate">${b.author}</p>
+              <p class="text-xs text-cyan-200 truncate">${b.author}</p>
             </div>
             <div class="flex items-center justify-between text-xs text-slate-400 mt-2">
-              <span class="text-amber-400 font-bold">★ ${b.rating || '4.2'}</span>
-              <span class="text-[11px] text-slate-500">Read</span>
+              <span class="text-candlelight font-bold">★ ${b.rating}</span>
+              <span class="text-[11px] text-cyan-300/60 font-medium">Read</span>
             </div>
           </div>
         </div>
       `).join('');
 
-      filtered.forEach(async (b, idx) => {
-        const coverUrl = await fetchBookCover(b.title, b.author, b.customCover);
-        const imgEl = document.getElementById(`archive-img-${idx}`);
-        if (imgEl) imgEl.src = coverUrl;
+      filtered.forEach((b, idx) => {
+        fetchBookCoverAndGenre(b, idx);
       });
     }
 
@@ -364,33 +431,33 @@
       document.getElementById('recCount').textContent = `${recommendations.length} total`;
 
       if (recommendations.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500 py-6 text-center">No nominees yet. Suggest one above!</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center">No nominees yet. Suggest one above!</p>`;
         return;
       }
 
       const sorted = [...recommendations].sort((a, b) => b.votes - a.votes);
 
       container.innerHTML = sorted.map((b) => `
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
+        <div class="bg-midnight/70 border border-[#002b82] rounded-xl p-3 flex items-center justify-between gap-3 shadow-md hover:border-burnBlue/60 transition">
           <div class="flex items-center gap-3 min-w-0">
-            <img id="rec-img-${b.id}" class="w-12 h-16 object-cover rounded shadow bg-slate-800 flex-shrink-0" 
-                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Crect width='100%25' height='100%25' fill='%231e293b'/%3E%3C/svg%3E" />
+            <img id="rec-img-${b.id}" class="w-12 h-16 object-cover rounded shadow bg-[#001744] flex-shrink-0" 
+                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Crect width='100%25' height='100%25' fill='%23001744'/%3E%3C/svg%3E" />
             <div class="min-w-0">
+              <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#001744] text-candlelight border border-candlelight/20 inline-block mb-0.5">
+                ${b.genre || 'General Fiction'}
+              </span>
               <h4 class="text-sm font-bold text-white truncate">${b.title}</h4>
-              <p class="text-xs text-slate-400 truncate">${b.author}</p>
-              <div class="flex gap-2 text-[10px] text-slate-500 mt-0.5">
-                ${b.suggestedBy ? `<span>By: ${b.suggestedBy}</span> • ` : ''}
-                <span>${b.genre || 'General'}</span>
-              </div>
+              <p class="text-xs text-cyan-200 truncate">${b.author}</p>
+              ${b.suggestedBy ? `<p class="text-[10px] text-slate-400">By: ${b.suggestedBy}</p>` : ''}
             </div>
           </div>
 
           <div class="flex items-center gap-2 flex-shrink-0">
-            <button onclick="upvoteRecommendation(${b.id})" title="Vote" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+            <button onclick="upvoteRecommendation(${b.id})" title="Vote" class="flex items-center gap-1.5 bg-[#001744] hover:bg-midnight active:scale-95 text-candlelight px-3 py-1.5 rounded-lg border border-[#003399] transition">
               <span class="text-xs font-semibold">▲</span>
               <span class="text-sm font-bold">${b.votes}</span>
             </button>
-            <button onclick="deleteRecommendation(${b.id})" title="Remove nominee" class="text-slate-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded-lg transition active:scale-90">
+            <button onclick="deleteRecommendation(${b.id})" title="Remove nominee" class="text-slate-400 hover:text-red-400 hover:bg-[#001744] p-1.5 rounded-lg transition active:scale-90">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
@@ -400,10 +467,27 @@
       `).join('');
 
       sorted.forEach(async (b) => {
-        const cover = await fetchBookCover(b.title, b.author, b.customCover);
+        const cover = b.customCover || (await fetchCoverOnly(b.title, b.author));
         const img = document.getElementById(`rec-img-${b.id}`);
         if (img) img.src = cover;
       });
+    }
+
+    async function fetchCoverOnly(title, author) {
+      const key = `${title}-${author}`.toLowerCase();
+      if (coverCache[key]) return coverCache[key].cover || coverCache[key];
+
+      try {
+        const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=1`);
+        const data = await olRes.json();
+        if (data.docs && data.docs[0]?.cover_i) {
+          const url = `https://covers.openlibrary.org/b/id/${data.docs[0].cover_i}-M.jpg`;
+          coverCache[key] = { cover: url, genre: '' };
+          return url;
+        }
+      } catch (e) {}
+
+      return `https://placehold.co/180x260/002063/00B1E1?text=${encodeURIComponent(title)}`;
     }
 
     async function handleNewRecommendation(e) {
@@ -412,7 +496,7 @@
       const author = document.getElementById('recAuthor').value.trim();
       const suggestedBy = document.getElementById('recBy').value.trim() || 'Gym Member';
       const genre = document.getElementById('recGenre').value.trim() || 'General Fiction';
-      const customCover = document.getElementById('recCoverUrl').value.trim();
+      const customCover = formatCoverUrl(document.getElementById('recCoverUrl').value.trim());
 
       if (!title || !author) return;
 
@@ -450,17 +534,17 @@
       updateWheelItems();
     }
 
-    // SPINNER WHEEL
-    const colors = ["#f59e0b", "#0284c7", "#10b981", "#8b5cf6", "#ec4899", "#f97316", "#06b6d4"];
+    // Official Burn Gym Palette for wheel slices
+    const wheelColors = ["#00B1E1", "#002063", "#FDDA13", "#008db5", "#003aa3", "#d4b300"];
 
     function loadWheelMode(mode) {
       wheelMode = mode;
       document.getElementById('btn-mode-all').className = mode === 'all' 
-        ? "px-3 py-1 rounded-md text-xs font-medium bg-amber-500 text-slate-950" 
-        : "px-3 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300";
+        ? "px-3 py-1 rounded-md text-xs font-bold bg-burnBlue text-midnight" 
+        : "px-3 py-1 rounded-md text-xs font-semibold bg-[#001744] text-slate-300 hover:text-white border border-[#003399]";
       document.getElementById('btn-mode-top3').className = mode === 'top3' 
-        ? "px-3 py-1 rounded-md text-xs font-medium bg-amber-500 text-slate-950" 
-        : "px-3 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300";
+        ? "px-3 py-1 rounded-md text-xs font-bold bg-burnBlue text-midnight" 
+        : "px-3 py-1 rounded-md text-xs font-semibold bg-[#001744] text-slate-300 hover:text-white border border-[#003399]";
       updateWheelItems();
     }
 
@@ -484,11 +568,11 @@
       ctx.clearRect(0, 0, 320, 320);
 
       if (currentWheelItems.length === 0) {
-        ctx.fillStyle = "#334155";
+        ctx.fillStyle = "#001744";
         ctx.beginPath();
         ctx.arc(160, 160, outsideRadius, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.fillStyle = "#94a3b8";
+        ctx.fillStyle = "#00B1E1";
         ctx.font = "bold 13px 'Plus Jakarta Sans'";
         ctx.textAlign = "center";
         ctx.fillText("No Nominees Added", 160, 165);
@@ -499,7 +583,8 @@
 
       for (let i = 0; i < currentWheelItems.length; i++) {
         const angle = startAngle + i * arc;
-        ctx.fillStyle = colors[i % colors.length];
+        const sliceColor = wheelColors[i % wheelColors.length];
+        ctx.fillStyle = sliceColor;
 
         ctx.beginPath();
         ctx.arc(160, 160, outsideRadius, angle, angle + arc, false);
@@ -507,7 +592,8 @@
         ctx.fill();
 
         ctx.save();
-        ctx.fillStyle = "#ffffff";
+        // Contrast text color depending on slice background
+        ctx.fillStyle = (sliceColor === "#FDDA13" || sliceColor === "#00B1E1") ? "#002063" : "#ffffff";
         ctx.translate(
           160 + Math.cos(angle + arc / 2) * textRadius,
           160 + Math.sin(angle + arc / 2) * textRadius
@@ -520,12 +606,12 @@
         ctx.restore();
       }
 
-      // Center circle
+      // Center ring
       ctx.beginPath();
       ctx.arc(160, 160, 25, 0, 2 * Math.PI);
-      ctx.fillStyle = "#0f172a";
+      ctx.fillStyle = "#002063";
       ctx.fill();
-      ctx.strokeStyle = "#f59e0b";
+      ctx.strokeStyle = "#FDDA13";
       ctx.lineWidth = 3;
       ctx.stroke();
     }
@@ -577,8 +663,8 @@
         title: currentWinner.title,
         author: currentWinner.author,
         customCover: currentWinner.customCover || '',
-        rating: 4.5,
-        genre: currentWinner.genre || 'Club Pick'
+        genre: currentWinner.genre || 'Club Pick',
+        rating: 4.5
       });
       deleteRecommendation(currentWinner.id);
       document.getElementById('winnerCard').classList.add('hidden');
