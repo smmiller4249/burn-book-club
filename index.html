@@ -72,10 +72,9 @@
         
         <!-- Left: Suggest Form & Voting List -->
         <div class="lg:col-span-7 space-y-6">
-          <!-- Suggestion Form -->
           <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
             <h3 class="text-lg font-bold text-white mb-1">Suggest a Book</h3>
-            <p class="text-xs text-slate-400 mb-4">No login required. Submit a title & author; cover art is fetched automatically!</p>
+            <p class="text-xs text-slate-400 mb-4">No login required. Drop title & author, or add a direct cover link if you have one!</p>
             <form id="recForm" onsubmit="handleNewRecommendation(event)" class="space-y-3">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -96,6 +95,10 @@
                   <label class="block text-xs font-semibold text-slate-300 mb-1">Genre / Pitch</label>
                   <input id="recGenre" type="text" placeholder="e.g. Thriller, Cozy Mystery" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-400 outline-none">
                 </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Optional Custom Cover Image URL</label>
+                <input id="recCoverUrl" type="url" placeholder="https://... (or leave blank to auto-fetch)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-400 outline-none">
               </div>
               <button type="submit" id="submitBtn" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-2.5 rounded-lg text-sm transition mt-2">
                 Add to Nominees
@@ -155,29 +158,11 @@
     // Live Google Sheet CSV URL
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTglAzQPF6Bgza9BxOatXJqeNfgBw6uES2Lfb_DwBcM9-RWjSy8ICHpnaD-e7wbMQm9foZR84-pUbc8/pub?output=csv";
 
-    // Fallback array if offline
-    const fallbackBooks = [
-      { title: "First Lie Wins", author: "Ashley Elston", rating: 4.5, genre: "Mystery / Thriller" },
-      { title: "Before We Were Innocent", author: "Ella Berman", rating: 4.2, genre: "Psychological Fiction" },
-      { title: "Just for the Summer", author: "Abby Jimenez", rating: 4.8, genre: "Romance / Contemporary" },
-      { title: "Mother-Daughter Murder Night", author: "Nina Simon", rating: 4.0, genre: "Whodunit" },
-      { title: "Twenty Years Later", author: "Charlie Donlea", rating: 4.3, genre: "Crime Thriller" },
-      { title: "I Hope This Finds You Well", author: "Natalie Sue", rating: 4.1, genre: "Humor / Workplace" },
-      { title: "The Only One Left", author: "Riley Sager", rating: 4.4, genre: "Gothic Thriller" },
-      { title: "Husbands", author: "Holly Gramazio", rating: 3.9, genre: "Sci-Fi / Comedy" },
-      { title: "The Drowning Woman", author: "Robyn Harding", rating: 4.3, genre: "Suspense" },
-      { title: "The Three Lives of Cate Kay", author: "Kate Fagan", rating: 4.0, genre: "Drama" },
-      { title: "The Southern Book Club's Guide to Slaying Vampires", author: "Grady Hendrix", rating: 4.6, genre: "Horror / Dark Comedy" },
-      { title: "Theo of Golden", author: "Allen Levi", rating: 4.7, genre: "Inspirational" },
-      { title: "Anatomy of an Alibi", author: "Ashley Elston", rating: 4.2, genre: "Legal Thriller" },
-      { title: "Bad Mother", author: "Mia Sheridan", rating: 4.5, genre: "Romantic Suspense" }
-    ];
-
     let pastReads = [];
     let recommendations = JSON.parse(localStorage.getItem('bbc_recommendations')) || [
-      { id: 1, title: "Yellowface", author: "R.F. Kuang", suggestedBy: "Coach Mike", genre: "Satire / Fiction", votes: 4 },
-      { id: 2, title: "The Maidens", author: "Alex Michaelides", suggestedBy: "Elena", genre: "Psychological Thriller", votes: 2 },
-      { id: 3, title: "Remarkably Bright Creatures", author: "Shelby Van Pelt", suggestedBy: "David", genre: "Fiction", votes: 5 }
+      { id: 1, title: "Yellowface", author: "R.F. Kuang", suggestedBy: "Coach Mike", genre: "Satire / Fiction", votes: 4, customCover: "" },
+      { id: 2, title: "The Maidens", author: "Alex Michaelides", suggestedBy: "Elena", genre: "Psychological Thriller", votes: 2, customCover: "" },
+      { id: 3, title: "Remarkably Bright Creatures", author: "Shelby Van Pelt", suggestedBy: "David", genre: "Fiction", votes: 5, customCover: "" }
     ];
 
     // Wheel State
@@ -194,7 +179,20 @@
     // Cache cover URLs in local storage
     const coverCache = JSON.parse(localStorage.getItem('bbc_cover_cache') || '{}');
 
-    // Parse CSV line helper that handles quoted strings
+    // Convert Google Drive view URLs to raw thumbnail/display URLs
+    function formatCoverUrl(url) {
+      if (!url) return "";
+      const trimmed = url.trim();
+      if (trimmed.includes('drive.google.com')) {
+        const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w600`;
+        }
+      }
+      return trimmed;
+    }
+
+    // CSV line parser handling quotes and commas
     function parseCSVLine(line) {
       const result = [];
       let cur = '';
@@ -217,7 +215,7 @@
     async function loadPastReadsFromSheet() {
       try {
         const res = await fetch(SHEET_CSV_URL);
-        if (!res.ok) throw new Error("Network response was not ok");
+        if (!res.ok) throw new Error("Network error");
         const csvText = await res.text();
         const lines = csvText.trim().split(/\r?\n/);
         const parsed = [];
@@ -231,6 +229,7 @@
             parsed.push({
               title: cols[0],
               author: cols[1] || 'Unknown Author',
+              customCover: cols[2] ? formatCoverUrl(cols[2]) : '',
               rating: (4.0 + (cols[0].length % 9) * 0.1).toFixed(1),
               genre: 'Club Read'
             });
@@ -240,22 +239,23 @@
         if (parsed.length > 0) {
           pastReads = parsed;
           document.getElementById('syncBadge').classList.remove('hidden');
-        } else {
-          pastReads = fallbackBooks;
         }
       } catch (err) {
-        console.warn("Could not load from Google Sheet CSV, falling back to local list:", err);
-        pastReads = fallbackBooks;
-        document.getElementById('syncBadge').textContent = 'Cached Mode';
+        console.warn("Could not load from Google Sheet CSV:", err);
       }
       renderArchive();
     }
 
-    async function fetchBookCover(title, author) {
+    async function fetchBookCover(title, author, customUrl = "") {
+      // 1. Direct custom cover (from Column C in Google Sheet or recommendation input)
+      if (customUrl) {
+        return formatCoverUrl(customUrl);
+      }
+
       const key = `${title}-${author}`.toLowerCase();
       if (coverCache[key]) return coverCache[key];
 
-      // 1. Try Open Library Search API
+      // 2. Open Library Search API
       try {
         const qTitle = encodeURIComponent(title.trim());
         const qAuthor = encodeURIComponent(author.trim());
@@ -274,7 +274,7 @@
         console.warn("Open Library fetch error:", e);
       }
 
-      // 2. Fallback to Google Books API
+      // 3. Fallback to Google Books API
       try {
         const query = encodeURIComponent(`${title} ${author}`);
         const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1`);
@@ -349,7 +349,7 @@
       `).join('');
 
       filtered.forEach(async (b, idx) => {
-        const coverUrl = await fetchBookCover(b.title, b.author);
+        const coverUrl = await fetchBookCover(b.title, b.author, b.customCover);
         const imgEl = document.getElementById(`archive-img-${idx}`);
         if (imgEl) imgEl.src = coverUrl;
       });
@@ -400,7 +400,7 @@
       `).join('');
 
       sorted.forEach(async (b) => {
-        const cover = await fetchBookCover(b.title, b.author);
+        const cover = await fetchBookCover(b.title, b.author, b.customCover);
         const img = document.getElementById(`rec-img-${b.id}`);
         if (img) img.src = cover;
       });
@@ -412,6 +412,7 @@
       const author = document.getElementById('recAuthor').value.trim();
       const suggestedBy = document.getElementById('recBy').value.trim() || 'Gym Member';
       const genre = document.getElementById('recGenre').value.trim() || 'General Fiction';
+      const customCover = document.getElementById('recCoverUrl').value.trim();
 
       if (!title || !author) return;
 
@@ -421,6 +422,7 @@
         author,
         suggestedBy,
         genre,
+        customCover,
         votes: 1
       };
 
@@ -448,7 +450,7 @@
       updateWheelItems();
     }
 
-    // SPINNER WHEEL IMPLEMENTATION
+    // SPINNER WHEEL
     const colors = ["#f59e0b", "#0284c7", "#10b981", "#8b5cf6", "#ec4899", "#f97316", "#06b6d4"];
 
     function loadWheelMode(mode) {
@@ -574,6 +576,7 @@
       pastReads.unshift({
         title: currentWinner.title,
         author: currentWinner.author,
+        customCover: currentWinner.customCover || '',
         rating: 4.5,
         genre: currentWinner.genre || 'Club Pick'
       });
